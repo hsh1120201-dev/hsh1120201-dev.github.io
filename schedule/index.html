@@ -107,8 +107,9 @@ function render(){
   $("status").className="status";$("status").textContent="讀取中…";
   loadMonth(M).then(function(model){
     var st=$("status");
-    if(!model){st.className="status warn";st.textContent="這個月還沒有班表，可以到後台排班。";$("cal").innerHTML="";$("notes").innerHTML="";$("summary").hidden=true;$("who").innerHTML='<option value="">全部人員</option>';return}
-    if(model.draft){st.className="status warn";st.textContent="這是依 12 月模式自動排的草稿，到後台按「儲存這個月」後就會變成正式班表。"}
+    var empty=!model;if(empty)model={days:{},notes:[]};
+    if(empty){st.className="status warn";st.textContent="這個月還沒有班表，可以到後台排班（國定假日已先標出）。"}
+    else if(model.draft){st.className="status warn";st.textContent="這是依 12 月模式自動排的草稿，到後台按「儲存這個月」後就會變成正式班表。"}
     else st.textContent=(model.fromData?"後台班表":"試算表「"+M.sheet+"」分頁")+"・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})+" 讀取";
     var cnt=monthHours(model,M),list=Object.keys(cnt);
     var who=$("who").value;if(list.indexOf(who)<0)who="";
