@@ -99,7 +99,7 @@ function hourRule(model){
     sat:rng(t,new RegExp("周六值勤時間\\s*"+T),[9,18]),
     A:rng(t,new RegExp("A時段[：:]\\s*"+T),[16,20]),
     B:rng(t,new RegExp("B時段[：:]\\s*"+T),[16.5,20]),
-    brk:/休息時間為半小時/.test(t)||!t?0.5:0
+    brk:0 // 休息時間不扣（H：早班 9:00-16:30 算 7.5 小時）
   };
 }
 function shiftHours(kind,lines,wd,R){
