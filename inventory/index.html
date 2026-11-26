@@ -62,6 +62,7 @@ footer a{color:var(--b)}
 <header><h1>倉儲清單</h1><p class="sub">新竹社會創新基地・物品與鑰匙</p></header>
 <div class="tabs" id="tabs"><button type="button" data-t="inv" class="on">物品清單</button><button type="button" data-t="key">鑰匙清冊</button></div>
 <p class="status" id="status">讀取中…</p>
+<div id="adm"></div>
 <div class="stats" id="stats"></div>
 <div class="tools" id="tools">
   <input type="search" id="q" placeholder="搜尋品項、位置、備註…">
@@ -71,6 +72,8 @@ footer a{color:var(--b)}
 <div id="list"></div>
 <footer>資料即時讀取自「新竹社創基地_倉儲清單」試算表，改試算表後重新整理即可更新｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
 </main>
+<script src="/backend/config.js"></script>
+<script src="/backend/admin.js"></script>
 <script>
 var SHEET_ID="1XneXMCvOJgRJLyZlF7CpyxEmQQZVaeA7";
 var data={},tab="inv";
@@ -85,7 +88,7 @@ function parseInv(rows){
   var items=[],cat="";
   rows.forEach(function(r){
     if(/^\d+$/.test(r[1]||"")&&r[2]){
-      var it={cat:cat,no:r[1],name:r[2],unit:r[3],stock:n(r[4]),use:n(r[5]),total:n(r[6]),where:r[7]||"",note:r[8]||"",flags:[]};
+      var it={row:r._row,cat:cat,no:r[1],name:r[2],unit:r[3],stock:n(r[4]),use:n(r[5]),total:n(r[6]),where:r[7]||"",note:r[8]||"",flags:[]};
       var th=it.note.match(/剩\s*(\d+)\s*\S?\s*時/);if(/採購/.test(it.note)&&th&&it.stock<=+th[1])it.flags.push(["buy",it.total==0?"已用完・要採購":"到採購量・要採購"]);
       if(!it.where||/^\?|？|待確認/.test(it.where)||/找不到|不知道在哪/.test(it.note)||r[0]=="?")it.flags.push(["where","位置待確認"]);
       items.push(it);
@@ -95,7 +98,7 @@ function parseInv(rows){
 }
 function parseKey(rows){
   var keys=[];
-  rows.forEach(function(r){if(/鑰匙/.test(r[1]||"")&&r[1]!="鑰匙名稱")keys.push({name:r[1],unit:r[2],qty:n(r[3]),lent:n(r[4]),free:n(r[5]),who:r[6]||"",note:r[7]||""})});
+  rows.forEach(function(r){if(/鑰匙/.test(r[1]||"")&&r[1]!="鑰匙名稱")keys.push({row:r._row,name:r[1],unit:r[2],qty:n(r[3]),lent:n(r[4]),free:n(r[5]),who:r[6]||"",note:r[7]||""})});
   return keys;
 }
 
@@ -107,8 +110,9 @@ function renderInv(){
   var shown=items.filter(function(i){return(!c||i.cat==c)&&(!f||i.flags.length)&&(!q||(i.name+" "+i.where+" "+i.note+" "+i.cat).toLowerCase().indexOf(q)>=0)});
   if(!shown.length){$("list").innerHTML='<p class="empty">沒有符合的品項</p>';return}
   var groups=[],gm={};shown.forEach(function(i){if(!gm[i.cat]){gm[i.cat]=[];groups.push(i.cat)}gm[i.cat].push(i)});
-  $("list").innerHTML=groups.map(function(g){return '<h2>'+esc(g||"未分類")+'（'+gm[g].length+'）</h2><table><thead><tr><th>No.</th><th>品項</th><th class="num">庫存</th><th class="num">使用中</th><th class="num">總數</th><th>位置</th><th>備註</th></tr></thead><tbody>'+gm[g].map(function(i){
-    return '<tr><td class="no">'+esc(i.no)+'</td><td class="name">'+esc(i.name)+'<br>'+i.flags.map(function(x){return '<span class="tag '+x[0]+'">'+x[1]+'</span>'}).join("")+'</td><td class="num" data-k="庫存">'+i.stock+' '+esc(i.unit)+'</td><td class="num" data-k="使用中">'+i.use+'</td><td class="num" data-k="總數">'+i.total+'</td><td data-k="位置">'+esc(i.where||"—")+'</td><td class="note"'+(i.note?' data-k="備註"':'')+'>'+esc(i.note)+'</td></tr>'}).join("")+'</tbody></table>'}).join("");
+  var edit=Admin.on();
+  $("list").innerHTML=groups.map(function(g){return '<h2>'+esc(g||"未分類")+'（'+gm[g].length+'）'+(edit?' <button class="adm-edit" data-addcat="'+esc(g)+'">＋新增品項</button>':'')+'</h2><table><thead><tr><th>No.</th><th>品項</th><th class="num">庫存</th><th class="num">使用中</th><th class="num">總數</th><th>位置</th><th>備註</th></tr></thead><tbody>'+gm[g].map(function(i){
+    return '<tr><td class="no">'+esc(i.no)+'</td><td class="name">'+esc(i.name)+(edit&&i.row?' <button class="adm-edit" data-inv="'+items.indexOf(i)+'">編輯</button>':'')+'<br>'+i.flags.map(function(x){return '<span class="tag '+x[0]+'">'+x[1]+'</span>'}).join("")+'</td><td class="num" data-k="庫存">'+i.stock+' '+esc(i.unit)+'</td><td class="num" data-k="使用中">'+i.use+'</td><td class="num" data-k="總數">'+i.total+'</td><td data-k="位置">'+esc(i.where||"—")+'</td><td class="note"'+(i.note?' data-k="備註"':'')+'>'+esc(i.note)+'</td></tr>'}).join("")+'</tbody></table>'}).join("");
 }
 function renderKey(){
   var keys=data.key,q=$("q").value.trim().toLowerCase(),f=$("flag").checked;
@@ -116,8 +120,9 @@ function renderKey(){
   $("stats").innerHTML=stat(keys.length,"種鑰匙")+stat(tot,"支（總數）")+stat(lent,"借出中",lent>0)+stat(tot-lent,"可借");
   var shown=keys.filter(function(k){return(!f||k.lent>0)&&(!q||(k.name+" "+k.who+" "+k.note).toLowerCase().indexOf(q)>=0)});
   if(!shown.length){$("list").innerHTML='<p class="empty">'+(f?"目前沒有借出的鑰匙":"沒有符合的鑰匙")+'</p>';return}
-  $("list").innerHTML='<table><thead><tr><th>鑰匙</th><th class="num">數量</th><th class="num">借出中</th><th class="num">可借</th><th>領用人</th><th>備註</th></tr></thead><tbody>'+shown.map(function(k){
-    return '<tr><td class="name">'+esc(k.name)+(k.lent>0?' <span class="tag lent">借出 '+k.lent+'</span>':'')+(k.qty>0&&k.free<=0?' <span class="tag out">全部借出</span>':'')+'</td><td class="num" data-k="數量">'+k.qty+' '+esc(k.unit)+'</td><td class="num" data-k="借出中">'+k.lent+'</td><td class="num" data-k="可借">'+k.free+'</td><td'+(k.who?' data-k="領用人"':'')+'>'+esc(k.who)+'</td><td class="note"'+(k.note?' data-k="備註"':'')+'>'+esc(k.note)+'</td></tr>'}).join("")+'</tbody></table><p class="note" style="margin-top:.8em">借鑰匙時請在試算表「鑰匙清冊」的「租借中」填借出數量、「領用人」填姓名。</p>';
+  var edit=Admin.on();
+  $("list").innerHTML=(edit?'<p><button class="adm-edit" data-addkey="1">＋新增鑰匙</button></p>':'')+'<table><thead><tr><th>鑰匙</th><th class="num">數量</th><th class="num">借出中</th><th class="num">可借</th><th>領用人</th><th>備註</th></tr></thead><tbody>'+shown.map(function(k){
+    return '<tr><td class="name">'+esc(k.name)+(edit&&k.row?' <button class="adm-edit" data-key="'+keys.indexOf(k)+'">編輯</button>':'')+(k.lent>0?' <span class="tag lent">借出 '+k.lent+'</span>':'')+(k.qty>0&&k.free<=0?' <span class="tag out">全部借出</span>':'')+'</td><td class="num" data-k="數量">'+k.qty+' '+esc(k.unit)+'</td><td class="num" data-k="借出中">'+k.lent+'</td><td class="num" data-k="可借">'+k.free+'</td><td'+(k.who?' data-k="領用人"':'')+'>'+esc(k.who)+'</td><td class="note"'+(k.note?' data-k="備註"':'')+'>'+esc(k.note)+'</td></tr>'}).join("")+'</tbody></table><p class="note" style="margin-top:.8em">借鑰匙時請在試算表「鑰匙清冊」的「租借中」填借出數量、「領用人」填姓名。</p>';
 }
 function stat(v,l,w){return '<div class="stat'+(w?' warn':'')+'"><b>'+v+'</b><span>'+l+'</span></div>'}
 function render(){
@@ -127,13 +132,46 @@ function render(){
   if(!data[tab])return;
   tab=="inv"?renderInv():renderKey();
 }
-Promise.all([get("倉儲清單"),get("鑰匙清冊")]).then(function(r){
-  data.inv=parseInv(r[0]);data.key=parseKey(r[1]);
-  var cats=[];data.inv.forEach(function(i){if(cats.indexOf(i.cat)<0)cats.push(i.cat)});
-  $("cat").innerHTML='<option value="">全部分類</option>'+cats.map(function(c){return '<option>'+esc(c)+'</option>'}).join("");
-  $("status").textContent="已讀取試算表・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
-  render();
-}).catch(function(e){$("status").className="status err";$("status").textContent="讀不到試算表："+e.message+"（請確認試算表共用設定為「知道連結的任何人可檢視」）"});
+function load(){
+  var on=Admin.on();
+  $("status").className="status";$("status").textContent="讀取中…";
+  Promise.all(on?[Admin.read("inv"),Admin.read("key")]:[get("倉儲清單"),get("鑰匙清冊")]).then(function(r){
+    data.inv=parseInv(r[0]);data.key=parseKey(r[1]);
+    var cats=[],c=$("cat").value;data.inv.forEach(function(i){if(cats.indexOf(i.cat)<0)cats.push(i.cat)});
+    $("cat").innerHTML='<option value="">全部分類</option>'+cats.map(function(x){return '<option'+(x==c?' selected':'')+'>'+esc(x)+'</option>'}).join("");
+    $("status").textContent=(on?"編輯模式・":"")+"已讀取試算表・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+    render();
+  }).catch(function(e){$("status").className="status err";$("status").textContent="讀不到試算表："+e.message+(on?"":"（請確認試算表共用設定為「知道連結的任何人可檢視」）")});
+}
+Admin.bar($("adm"),load);load();
+function invForm(i,cat,after){
+  Admin.form({title:i?"編輯品項":"新增品項（"+(cat||"未分類")+"）",fields:[
+    {k:"name",label:"品項名稱",value:i?i.name:""},
+    {k:"no",label:"No.",value:i?i.no:"",half:1},{k:"unit",label:"單位",value:i?i.unit:"",half:1},
+    {k:"stock",label:"庫存數量",type:"number",value:i?i.stock:0,half:1},{k:"use",label:"使用中數量",type:"number",value:i?i.use:0,half:1},
+    {k:"where",label:"位置",value:i?i.where:""},{k:"note",label:"備註",type:"textarea",value:i?i.note:""}],
+    submit:function(v){if(!v.name.trim())throw new Error("請填品項名稱");
+      var vals={2:v.no,3:v.name,4:v.unit,5:v.stock||0,6:v.use||0,8:v.where,9:v.note};
+      return Admin.api(i?{action:"update",t:"inv",row:i.row,check:i.name,values:vals}:{action:"add",t:"inv",after:after,values:vals}).then(load)},
+    del:i?function(){return Admin.api({action:"delete",t:"inv",row:i.row,check:i.name}).then(load)}:null});
+}
+function keyForm(k){
+  Admin.form({title:k?"編輯鑰匙・"+k.name:"新增鑰匙",fields:[
+    {k:"name",label:"鑰匙名稱",value:k?k.name:"鑰匙 "},
+    {k:"qty",label:"數量",type:"number",value:k?k.qty:1,half:1},{k:"lent",label:"借出中",type:"number",value:k?k.lent:0,half:1},
+    {k:"who",label:"領用人",value:k?k.who:""},{k:"note",label:"備註",type:"textarea",value:k?k.note:""}],
+    submit:function(v){if(!v.name.trim())throw new Error("請填鑰匙名稱");if(+v.lent>+v.qty)throw new Error("借出數量不能大於總數");
+      var vals={2:v.name,3:k?k.unit:"支",4:v.qty||0,5:v.lent||0,7:v.who,8:v.note};
+      var lastRow=data.key.length?data.key[data.key.length-1].row:0;
+      return Admin.api(k?{action:"update",t:"key",row:k.row,check:k.name,values:vals}:{action:"add",t:"key",after:lastRow,values:vals}).then(load)},
+    del:k?function(){return Admin.api({action:"delete",t:"key",row:k.row,check:k.name}).then(load)}:null});
+}
+$("list").addEventListener("click",function(e){var d=e.target.dataset;if(!d)return;
+  if(d.inv)invForm(data.inv[+d.inv]);
+  else if(d.key)keyForm(data.key[+d.key]);
+  else if(d.addkey)keyForm(null);
+  else if("addcat" in d){var cat=d.addcat,last=null;data.inv.forEach(function(i){if(i.cat==cat)last=i});if(last)invForm(null,cat,last.row)}
+});
 $("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;tab=b.dataset.t;$("flag").checked=false;render()});
 ["q","cat","flag"].forEach(function(id){$(id).addEventListener(id=="q"?"input":"change",render)});
 </script>
