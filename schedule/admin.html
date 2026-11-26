@@ -75,10 +75,8 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 <header><h1>班表後台</h1><a href="./">← 看班表</a></header>
 
 <div id="gate" class="gate">
-  <p>請輸入後台密碼</p>
-  <input type="password" id="pw" autocomplete="current-password" placeholder="密碼">
-  <input type="text" id="me" placeholder="你的名字（記錄是誰改的）">
-  <button class="pri" id="login">進入後台</button>
+  <p>班表後台請用 Google 帳號登入<br><small style="color:#888">跟報名後台同一份帳號名單</small></p>
+  <button class="pri" id="login" type="button">使用 Google 帳號登入</button>
   <p class="msg" id="gmsg"></p>
 </div>
 
@@ -88,6 +86,7 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
     <select id="mo"></select>
     <span class="state" id="state"></span>
     <span class="sp"></span>
+    <span class="state" id="who"></span><button class="sec" id="out" type="button">登出</button>
     <button class="sec" id="reload" type="button">重新讀取</button>
     <button class="pri" id="save" type="button">儲存這個月</button>
   </div>
@@ -108,33 +107,22 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 </div>
 </main>
 <script src="/backend/config.js?v=2"></script>
+<script src="/backend/admin.js?v=4"></script>
 <script src="common.js?v=2"></script>
 <script>
 var MONTHS=monthList(),cur=0,days={},dirty=false,src="";
 var STATUS=["休館","不須值勤","無晚班","待定"];
 function $(id){return document.getElementById(id)}
-function pass(){try{return sessionStorage.getItem("base-pass")||""}catch(e){return ""}}
 function api(body){
-  if(!BASE_API)return Promise.reject(new Error("後台還沒連上：Apps Script 尚未部署（見 backend/apps-script.gs 說明）"));
-  return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})
-    .then(function(r){return r.json()},function(){throw new Error("連不上後台，請稍後再試")})
-    .then(function(j){if(!j.ok)throw new Error(j.error||"失敗");return j});
+  if(!BASE_API)return Promise.reject(new Error("後台還沒連上"));
+  return Admin.api(body);
 }
-// ===== 登入 =====
-try{$("me").value=localStorage.getItem("sched-me")||""}catch(e){}
-$("login").onclick=function(){
-  var p=$("pw").value.trim();if(!p){$("gmsg").textContent="請輸入密碼";return}
-  $("gmsg").textContent="確認中…";
-  api({action:"login",pass:p}).then(function(){
-    try{sessionStorage.setItem("base-pass",p);localStorage.setItem("sched-me",$("me").value.trim())}catch(e){}
-    start();
-  }).catch(function(e){$("gmsg").textContent=e.message});
-};
-$("pw").addEventListener("keydown",function(e){if(e.key=="Enter")$("login").click()});
-if(pass())start();
+$("login").onclick=function(){$("gmsg").textContent="";Admin.login(function(){start()})};
+if(Admin.on())start();
 
 function start(){
   $("gate").hidden=true;$("app").hidden=false;
+  $("who").textContent=Admin.email();
   var n=new Date();MONTHS.forEach(function(M,i){if(M.y==n.getFullYear()&&M.m==n.getMonth()+1)cur=i});
   // 預設打開下個月
   if(MONTHS[cur+1])cur++;
@@ -144,6 +132,7 @@ function drawMonthSel(){var M=MONTHS[cur];$("yr").value=M.yr;$("mo").innerHTML="
 function pick(){var yr=+$("yr").value,m=+$("mo").value;if(dirty&&!confirm("這個月還沒儲存，確定要切換嗎？")){drawMonthSel();return}
   MONTHS.forEach(function(M,i){if(M.yr==yr&&M.m==m)cur=i});drawMonthSel();load()}
 $("yr").onchange=pick;$("mo").onchange=pick;
+$("out").onclick=function(){if(dirty&&!confirm("還沒儲存，確定登出？"))return;dirty=false;Admin.logout();location.reload()};
 $("reload").onclick=function(){if(dirty&&!confirm("放棄還沒儲存的修改？"))return;load()};
 window.addEventListener("beforeunload",function(e){if(dirty){e.preventDefault();e.returnValue=""}});
 
@@ -228,12 +217,11 @@ $("save").onclick=function(){
   var M=MONTHS[cur],btn=$("save");
   var list=Object.keys(days).map(function(d){var x=days[d];return{date:ym(M)+"-"+pad(d),early:x.early.trim(),earlyNote:x.earlyNote.trim(),late:x.late.trim(),lateNote:x.lateNote.trim(),event:x.event.trim()}});
   btn.disabled=true;btn.textContent="儲存中…";
-  var me="";try{me=localStorage.getItem("sched-me")||""}catch(e){}
-  api({action:"saveMonth",pass:pass(),month:ym(M),days:list,by:me}).then(function(){
+  api({action:"saveMonth",month:ym(M),days:list,by:Admin.email()}).then(function(){
     src="data";setDirty(false);_data=null;
     $("rows").querySelectorAll("tr.chg").forEach(function(r){r.classList.remove("chg")});
     var info=$("info");info.hidden=false;info.className="info ok";info.textContent="已儲存 "+M.yr+"年"+M.m+"月班表（"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})+"），前台重新整理就會看到。";
-  }).catch(function(e){alert("儲存失敗："+e.message);if(/密碼/.test(e.message)){try{sessionStorage.removeItem("base-pass")}catch(_){}}})
+  }).catch(function(e){alert("儲存失敗："+e.message);if(/登入/.test(e.message)){$("gate").hidden=false}})
   .then(function(){btn.disabled=false;btn.textContent="儲存這個月"});
 };
 </script>

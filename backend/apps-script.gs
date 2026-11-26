@@ -4,7 +4,7 @@
  * 安裝：
  * 1. 打開「2026社創基地班表」試算表 > 擴充功能 > Apps Script，貼上本檔全部內容、儲存
  * 2. 確認下面 INVENTORY_ID、FINANCE_ID 是正確的試算表 ID（倉儲清單要是 Google 試算表格式，不能是 .xlsx）
- * 3. 左側齒輪「專案設定」> 指令碼屬性 > 新增屬性 ADMIN_PASS，值＝後台密碼
+ * 3. 登入：用活動報名系統後台的 Google 帳號登入（名單＝報名系統試算表「後台帳號」A 欄），不用另外設密碼
  * 4. 部署 > 新增部署作業 > 類型「網頁應用程式」，執行身分「我」，存取權「所有人」> 部署，第一次會要求授權
  * 5. 把網頁應用程式網址貼到 GitHub 的 backend/config.js（BASE_API）
  *
@@ -12,6 +12,8 @@
  */
 var INVENTORY_ID = '請填倉儲清單 Google 試算表 ID';
 var FINANCE_ID = '1uh2QXVU3uNwI5VTFAQvu71rm89IglIsWTef7B_6JkiI';
+// 活動報名系統的 Apps Script（Google 登入與後台帳號名單沿用這裡）
+var ACTIVITY_API = 'https://script.google.com/macros/s/AKfycbyRp9pfZlfnr-UiOJizY5ASMGFyHFLM8pzPBOV4QfUZyQOuaZQ6S-k7HS-63Kvji0Xrlw/exec';
 
 // 各表格：檔案、分頁、可以改的欄（從 1 開始）、用來確認是哪一列的欄
 var TABLES = {
@@ -42,10 +44,9 @@ function doGet(e) {
 function doPost(e) {
   try {
     var d = JSON.parse(e.postData.contents);
-    var pass = PropertiesService.getScriptProperties().getProperty('ADMIN_PASS');
-    if (!pass) throw new Error('還沒設定後台密碼（指令碼屬性 ADMIN_PASS）');
-    if (d.pass !== pass) throw new Error('密碼錯誤');
-    if (d.action == 'login') return out_({ ok: true });
+    var who = auth_(d.token);
+    if (d.action == 'login') return out_({ ok: true, email: who });
+    d.by = d.by || who;
     var lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
@@ -117,3 +118,24 @@ function saveMonth_(month, days, by) {
   if (s.getLastRow() > 1) s.getRange(2, 1, s.getLastRow() - 1, HEAD.length).clearContent();
   if (rows.length) { s.getRange(2, 1, rows.length, 1).setNumberFormat('@'); s.getRange(2, 1, rows.length, HEAD.length).setValues(rows); }
 }
+
+// ===== 登入驗證：把報名系統發的登入憑證拿回報名系統確認（同一份後台帳號名單） =====
+function auth_(token) {
+  token = String(token || '');
+  var parts = token.split('.');
+  if (parts.length != 3 || Number(parts[0]) < Date.now()) throw new Error('登入已過期，請重新用 Google 帳號登入');
+  var email = '';
+  try { email = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString(); } catch (e) {}
+  var key = 'tok_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token));
+  var cache = CacheService.getScriptCache();
+  if (cache.get(key)) return email;
+  var res = UrlFetchApp.fetch(ACTIVITY_API, { method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify({ action: 'boardAdmin', token: token }), muteHttpExceptions: true, followRedirects: true });
+  var j = {};
+  try { j = JSON.parse(res.getContentText()); } catch (e) {}
+  if (!j.ok) throw new Error('登入已過期或沒有後台權限，請重新用 Google 帳號登入');
+  cache.put(key, '1', 600);
+  return email;
+}
+
+// 第一次部署前在編輯器執行一次這個函式，讓 Google 授權「連到外部網址」
+function 授權() { UrlFetchApp.fetch(ACTIVITY_API + '?action=loginConfig', { muteHttpExceptions: true }); }
