@@ -35,6 +35,7 @@ th{background:#fff5df;font-weight:700;white-space:nowrap}
 td.num,th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 td.date{white-space:nowrap;color:#555}
 td.item{white-space:pre-line}
+tr.ed{cursor:pointer}tr.ed:hover td{background:#fffaf0}
 td.note{color:#666;font-size:.88em}
 .tag{display:inline-block;font-size:.75em;font-weight:700;border-radius:6px;padding:1px 6px;background:#fff1c9;color:#7a5600;margin-left:4px}
 .small{color:var(--mute);font-size:.82em;margin:.5em 0 0}
@@ -57,12 +58,15 @@ footer a{color:var(--b)}
 <header><h1>零用金收支</h1><p class="sub">新竹社會創新基地・支出與收入紀錄</p></header>
 <div class="tabs" id="tabs"><button type="button" data-t="out" class="on">支出</button><button type="button" data-t="in">收入</button></div>
 <p class="status" id="status">讀取中…</p>
+<div id="adm"></div>
 <div class="stats" id="stats"></div>
 <div class="tools"><input type="search" id="q" placeholder="搜尋品項、備註、代墊人…"><select id="mon"><option value="">全部月份</option></select></div>
 <div id="list"></div>
 <div id="extra"></div>
 <footer>資料即時讀取自「社創基地｜財務」試算表，改試算表後重新整理即可更新｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
 </main>
+<script src="/backend/config.js"></script>
+<script src="/backend/admin.js"></script>
 <script>
 var SHEET_ID="1uh2QXVU3uNwI5VTFAQvu71rm89IglIsWTef7B_6JkiI";
 var data={},tab="out";
@@ -78,7 +82,7 @@ function date(s){var m=String(s).match(/(\d{2,4})[\/\-.](\d{1,2})[\/\-.](\d{1,2}
 function parse(rows,isOut){
   var list=[];
   rows.forEach(function(r){var d=date(r[0]);if(!d||!r[1])return;
-    var e={d:d,item:r[1],amt:money(r[2]),raw:r[2],note:(isOut?r[4]:r[3])||""};
+    var e={row:r._row,date0:r[0],d:d,item:r[1],amt:money(r[2]),raw:r[2],note:(isOut?r[4]:r[3])||""};
     if(/^(加總|小計|合計)$/.test(e.item))e.sub=true;
     if(isOut){var p=e.note.match(/[$＄]\s*(\d+)\s*由\s*([^\s，,。]+?)代墊/),q=e.note.match(/([A-Za-z]+|[一-鿿]{1,3})代墊/);
       if(p)e.adv={who:p[2],amt:+p[1]};else if(q)e.adv={who:q[1],amt:e.amt}}
@@ -98,17 +102,42 @@ function render(){
   var tin=tot(data["in"]),tout=tot(data.out);
   $("stats").innerHTML='<div class="stat '+tab+'"><b>'+fmt(sum)+'</b><span>'+(mon||"全部")+(isOut?"支出":"收入")+'（'+list.filter(function(e){return!e.sub}).length+' 筆）</span></div><div class="stat out"><b>'+fmt(tout)+'</b><span>支出總計</span></div><div class="stat in"><b>'+fmt(tin)+'</b><span>收入總計</span></div>';
   if(!list.length){$("list").innerHTML='<p class="empty">沒有符合的紀錄</p>';$("extra").innerHTML="";return}
-  $("list").innerHTML='<table><thead><tr><th>日期</th><th>品項</th><th class="num">金額</th><th>備註</th></tr></thead><tbody>'+list.map(function(e){
-    return '<tr'+(e.sub?' style="background:#f6f3ec"':'')+'><td class="date">'+e.d.txt+'</td><td class="item">'+esc(e.item)+'</td><td class="num">'+(e.sub?'<span class="tag">點交小計・不計入</span> ':'')+fmt(e.amt)+(/含稅/.test(e.raw)?'<span class="tag">含稅</span>':'')+'</td><td class="note">'+esc(e.note)+'</td></tr>'}).join("")+'</tbody></table>';
+  var edit=Admin.on();
+  $("list").innerHTML=(edit?'<p><button class="adm-edit" id="addRec">＋新增一筆'+(isOut?'支出':'收入')+'</button> <span class="small">點任一列可以修改或刪除</span></p>':'')+'<table><thead><tr><th>日期</th><th>品項</th><th class="num">金額</th><th>備註</th></tr></thead><tbody>'+list.map(function(e){
+    return '<tr'+(edit&&e.row?' data-i="'+all.indexOf(e)+'" class="ed"':'')+(e.sub?' style="background:#f6f3ec"':'')+'><td class="date">'+e.d.txt+'</td><td class="item">'+esc(e.item)+'</td><td class="num">'+(e.sub?'<span class="tag">點交小計・不計入</span> ':'')+fmt(e.amt)+(/含稅/.test(e.raw)?'<span class="tag">含稅</span>':'')+'</td><td class="note">'+esc(e.note)+'</td></tr>'}).join("")+'</tbody></table>';
   if(isOut){var adv={};list.forEach(function(e){if(e.adv){var w=norm(e.adv.who);adv[w]=adv[w]||{n:0,a:0};adv[w].n++;adv[w].a+=e.adv.amt}});var ks=Object.keys(adv).sort(function(a,b){return adv[b].a-adv[a].a});
     $("extra").innerHTML=ks.length?'<h2>代墊彙整</h2><table><thead><tr><th>代墊人</th><th class="num">筆數</th><th class="num">金額</th></tr></thead><tbody>'+ks.map(function(k){return '<tr><td>'+esc(k)+'</td><td class="num">'+adv[k].n+'</td><td class="num">'+fmt(adv[k].a)+'</td></tr>'}).join("")+'</tbody></table><p class="small">依備註裡「○○代墊」自動整理，僅供參考；是否已歸還請以實際紀錄為準。</p>':"";
   }else $("extra").innerHTML="";
 }
-Promise.all([get("支出"),get("收入")]).then(function(r){
-  data.out=parse(r[0],true);data["in"]=parse(r[1],false);
-  $("status").textContent="已讀取試算表・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
-  render();
-}).catch(function(e){$("status").className="status err";$("status").textContent="讀不到試算表："+e.message+"（請確認試算表共用設定為「知道連結的任何人可檢視」）"});
+function load(){
+  var on=Admin.on();
+  $("status").className="status";$("status").textContent="讀取中…";
+  Promise.all(on?[Admin.read("out"),Admin.read("in")]:[get("支出"),get("收入")]).then(function(r){
+    data.out=parse(r[0],true);data["in"]=parse(r[1],false);
+    $("status").textContent=(on?"編輯模式・":"")+"已讀取試算表・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+    render();
+  }).catch(function(e){$("status").className="status err";$("status").textContent="讀不到試算表："+e.message+(on?"":"（請確認試算表共用設定為「知道連結的任何人可檢視」）")});
+}
+Admin.bar($("adm"),load);load();
+function iso(d){return d?(d.y+1911)+"-"+("0"+d.m).slice(-2)+"-"+("0"+d.d).slice(-2):new Date(Date.now()+8*3600e3).toISOString().slice(0,10)}
+function recForm(e){
+  var isOut=tab=="out";
+  Admin.form({title:(e?"修改":"新增")+(isOut?"支出":"收入"),fields:[
+    {k:"date",label:"日期",type:"date",value:iso(e&&e.d)},
+    {k:"item",label:"品項",type:"textarea",value:e?e.item:""},
+    {k:"amt",label:"金額",value:e?e.raw:"",half:1},{k:"note",label:isOut?"備註（例：KONO代墊）":"備註",value:e?e.note:"",half:1}],
+    submit:function(v){
+      if(!v.date)throw new Error("請選日期");if(!v.item.trim())throw new Error("請填品項");if(!/\d/.test(v.amt))throw new Error("請填金額");
+      var p=v.date.split("-"),date=isOut?("0"+(p[0]-1911)+"/"+p[1]+"/"+p[2]):(+p[0])+"/"+(+p[1])+"/"+(+p[2]);
+      var amt=v.amt.trim();if(/^\d+(\.\d+)?$/.test(amt)&&isOut)amt="$"+amt;
+      var vals=isOut?{1:date,2:v.item,3:amt,5:v.note}:{1:date,2:v.item,3:amt,4:v.note};
+      return Admin.api(e?{action:"update",t:tab,row:e.row,check:e.item,values:vals}:{action:"add",t:tab,values:vals}).then(load)},
+    del:e?function(){return Admin.api({action:"delete",t:tab,row:e.row,check:e.item}).then(load)}:null});
+}
+$("list").addEventListener("click",function(ev){
+  if(ev.target.id=="addRec"){recForm(null);return}
+  var tr=ev.target.closest("tr.ed");if(tr)recForm(data[tab][+tr.dataset.i]);
+});
 $("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;tab=b.dataset.t;$("mon").value="";render()});
 $("q").addEventListener("input",render);$("mon").addEventListener("change",render);
 </script>
