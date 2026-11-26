@@ -167,4 +167,11 @@ function holidays(Y){
   return out;
 }
 var _hol={};
-function holidayName(y,m,d){if(!_hol[y])_hol[y]=holidays(y);return _hol[y][y+"-"+pad(m)+"-"+pad(d)]||""}
+// 連假裡的週六（前一天週五放假，或後天週一放假）也算休館，例如元旦 1/1 週五放假 → 1/2 週六一起休
+function holidayName(y,m,d){
+  function h(dt){var Y=dt.getFullYear();if(!_hol[Y])_hol[Y]=holidays(Y);return _hol[Y][Y+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate())]||""}
+  var dt=new Date(y,m-1,d),n=h(dt);if(n)return n;
+  if(dt.getDay()==6){var f=h(new Date(y,m-1,d-1))||h(new Date(y,m-1,d+2));if(f)return f.replace(/（.*）|補假/g,"")+"連假"}
+  if(dt.getDay()==0){var f2=h(new Date(y,m-1,d-2))||h(new Date(y,m-1,d+1));if(f2)return f2.replace(/（.*）|補假/g,"")+"連假"}
+  return "";
+}
