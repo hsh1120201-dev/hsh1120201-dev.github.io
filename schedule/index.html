@@ -89,7 +89,7 @@ footer a{color:var(--b)}
 <footer><a href="admin.html">班表後台</a>｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
 </main>
 <script src="/backend/config.js?v=2"></script>
-<script src="common.js?v=2"></script>
+<script src="common.js?v=3"></script>
 <script>
 var MONTHS=monthList(),cur=0;
 function $(id){return document.getElementById(id)}
@@ -124,7 +124,7 @@ function render(){
     $("notes").innerHTML=(model.notes||[]).map(function(n){return '<div>'+esc(n)+'</div>'}).join("");
     var tot=0;list.forEach(function(k){tot+=cnt[k].h});
     $("summary").hidden=!list.length;
-    $("summary").innerHTML='<h3>本月班數與時數</h3><table><tr><th>人員</th><th>早班</th><th>晚班</th><th>時數</th></tr>'+list.map(function(k){return '<tr'+(k==who?' style="background:#e8f1fa"':'')+'><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td><b>'+cnt[k].h+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th></tr></table><p class="hint">時數依當月備註的值勤時間計算（早班扣休息半小時；晚班沒寫時段當 B 時段；格子裡寫「15:00-20:00」或「17:00到班」會照寫的算）。</p>';
+    $("summary").innerHTML='<h3>本月班數與時數</h3><table><tr><th>人員</th><th>早班</th><th>晚班</th><th>時數</th></tr>'+list.map(function(k){return '<tr'+(k==who?' style="background:#e8f1fa"':'')+'><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td><b>'+cnt[k].h+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th></tr></table><p class="hint">時數依當月備註的值勤時間計算（休息時間不扣；晚班沒寫時段當 B 時段；格子裡寫「15:00-20:00」或「17:00到班」會照寫的算）。</p>';
   });
 }
 function drawTabs(){var yr=MONTHS[cur].yr;$("yr").value=yr;$("tabs").innerHTML=MONTHS.map(function(M,i){return M.yr==yr?'<button type="button" data-i="'+i+'">'+M.label+'</button>':""}).join("")}

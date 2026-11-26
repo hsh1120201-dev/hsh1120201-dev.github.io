@@ -108,7 +108,7 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 </main>
 <script src="/backend/config.js?v=2"></script>
 <script src="/backend/admin.js?v=4"></script>
-<script src="common.js?v=2"></script>
+<script src="common.js?v=3"></script>
 <script>
 var MONTHS=monthList(),cur=0,days={},dirty=false,src="";
 var STATUS=["休館","不須值勤","無晚班","待定"];
@@ -178,7 +178,7 @@ function toModel(){var m={days:{},notes:DEFAULT_NOTES};Object.keys(days).forEach
 function drawSide(){
   var cnt=monthHours(toModel(),MONTHS[cur]),ks=Object.keys(cnt),tot=0;ks.forEach(function(k){tot+=cnt[k].h});
   $("side").innerHTML='<h3>'+MONTHS[cur].yr+'年'+MONTHS[cur].m+'月 班數與時數</h3>'+(ks.length?'<table><tr><th>人員</th><th>早</th><th>晚</th><th>時數</th></tr>'+ks.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td><b>'+cnt[k].h+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th></tr></table>':'<p class="hint">還沒有排班</p>')+
-    '<p class="hint">早班：平日 9:00-16:30、週六 9:00-18:00，扣休息半小時。晚班：A 16:00-20:00、B 16:30-20:00（沒寫當 B）。備註寫「15:00-20:00」或「17:00到班」會照寫的算。</p>';
+    '<p class="hint">早班：平日 9:00-16:30、週六 9:00-18:00（休息時間不扣）。晚班：A 16:00-20:00、B 16:30-20:00（沒寫當 B）。備註寫「15:00-20:00」或「17:00到班」會照寫的算。</p>';
   var names={};STATUS.forEach(function(s){names[s]=1});ks.forEach(function(k){names[k]=1});
   Object.keys(_knownNames).forEach(function(k){names[k]=1});
   $("names").innerHTML=Object.keys(names).map(function(n){return '<option>'+esc(n)+'</option>'}).join("");
