@@ -32,6 +32,7 @@ details{background:#fff;border-radius:12px;padding:10px 14px;margin:.8em 0;box-s
 summary{cursor:pointer;font-weight:700}
 .tpl{display:grid;grid-template-columns:3em repeat(4,minmax(0,1fr));gap:6px;margin:.8em 0;align-items:center;font-size:.92em}
 .tpl b{text-align:center}
+.tpl select{font:inherit;padding:.35em .4em;border-radius:8px;border:1px solid #ccc;width:100%;background:#fff}
 .tpl input{font:inherit;padding:.35em .5em;border-radius:8px;border:1px solid #ccc;width:100%}
 .wrap{display:grid;grid-template-columns:1fr 260px;gap:14px;align-items:start;margin-top:.8em}
 table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
@@ -42,6 +43,8 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 .ed tr.sun td{background:#f7f5f0}
 .ed tr.sat td.d{color:var(--b)}
 .ed tr.sun td.d{color:var(--r)}
+.ed select{font:inherit;width:100%;padding:.35em .3em;border:1px solid #e3dccd;border-radius:7px;background:#fff}
+.ed select.off{color:#999}
 .ed input{font:inherit;width:100%;padding:.35em .45em;border:1px solid transparent;border-radius:7px;background:transparent}
 .ed input:hover{border-color:#e3dccd}
 .ed input:focus{border-color:var(--b);background:#fff;outline:0}
@@ -126,7 +129,7 @@ function start(){
   var n=new Date();MONTHS.forEach(function(M,i){if(M.y==n.getFullYear()&&M.m==n.getMonth()+1)cur=i});
   // 預設打開下個月
   if(MONTHS[cur+1])cur++;
-  drawMonthSel();load();
+  $("state").textContent="讀取人員名單…";loadNames().then(function(){drawMonthSel();load()});
 }
 function drawMonthSel(){var M=MONTHS[cur];$("yr").value=M.yr;$("mo").innerHTML="";for(var i=1;i<=12;i++)$("mo").innerHTML+='<option value="'+i+'"'+(i==M.m?' selected':'')+'>'+i+'月</option>'}
 function pick(){var yr=+$("yr").value,m=+$("mo").value;if(dirty&&!confirm("這個月還沒儲存，確定要切換嗎？")){drawMonthSel();return}
@@ -166,12 +169,20 @@ function drawRows(){
   var M=MONTHS[cur],first=(new Date(M.y,M.m-1,1).getDay()+6)%7,h="";
   Object.keys(days).forEach(function(d){var x=days[d],wd=(first+(+d)-1)%7;
     h+='<tr data-d="'+d+'" class="'+(wd==6?'sun':wd==5?'sat':'')+'"><td class="d">'+M.m+'/'+d+' <small>'+WK[wd]+'</small></td>'+
-      inp("ev","event",x.event,"活動／假日")+inp("e","early",x.early,"早班","names")+inp("e","earlyNote",x.earlyNote,"早班備註")+inp("l","late",x.late,"晚班","names")+inp("l","lateNote",x.lateNote,"晚班時段","lateNotes")+'</tr>'});
+      inp("ev","event",x.event,"活動／假日")+sel("e","early",x.early,"早班")+inp("e","earlyNote",x.earlyNote,"早班備註")+sel("l","late",x.late,"晚班")+inp("l","lateNote",x.lateNote,"晚班時段","lateNotes")+'</tr>'});
   $("rows").innerHTML=h;styleOff();
 }
 function inp(cls,k,v,label,list){return '<td class="'+cls+'" data-k="'+label+'"><input data-f="'+k+'" value="'+esc(v)+'"'+(list?' list="'+list+'"':'')+' aria-label="'+label+'"></td>'}
-function styleOff(){$("rows").querySelectorAll("input[data-f=early],input[data-f=late]").forEach(function(i){i.className=OFF.test(i.value.trim())?"off":""})}
-$("rows").addEventListener("input",function(e){var i=e.target;if(!i.dataset.f)return;var tr=i.closest("tr");days[tr.dataset.d][i.dataset.f]=i.value;tr.classList.add("chg");setDirty(true);styleOff();drawSide()});
+function nameList(){return Object.keys(_knownNames).sort(function(a,b){return a.localeCompare(b,"zh-Hant")})}
+function opts(v){var L=nameList(),h='<option value="">（空白）</option><optgroup label="人員">';
+  if(v&&L.indexOf(v)<0&&STATUS.indexOf(v)<0)L=[v].concat(L);
+  h+=L.map(function(n){return '<option'+(n==v?' selected':'')+'>'+esc(n)+'</option>'}).join("")+'</optgroup><optgroup label="狀態">'+STATUS.map(function(n){return '<option'+(n==v?' selected':'')+'>'+n+'</option>'}).join("")+'</optgroup><option value="__other">＋其他（自己輸入）…</option>';return h}
+function sel(cls,k,v,label){return '<td class="'+cls+'" data-k="'+label+'"><select data-f="'+k+'" aria-label="'+label+'">'+opts(v)+'</select></td>'}
+function other(s,cb){if(s.value!="__other")return cb(s.value);var n=(prompt("輸入名字")||"").trim();if(n){_knownNames[n]=1;s.innerHTML=opts(n)}else s.value="";cb(s.value)}
+function styleOff(){$("rows").querySelectorAll("select[data-f=early],select[data-f=late]").forEach(function(i){i.className=OFF.test(i.value.trim())?"off":""})}
+function onEdit(e){var i=e.target;if(!i.dataset.f)return;if(i.tagName=="SELECT"&&e.type=="input")return;
+  other(i,function(v){var tr=i.closest("tr");days[tr.dataset.d][i.dataset.f]=v;tr.classList.add("chg");setDirty(true);styleOff();drawSide()})}
+$("rows").addEventListener("input",onEdit);$("rows").addEventListener("change",function(e){if(e.target.tagName=="SELECT")onEdit(e)});
 function setDirty(v){dirty=v;var s=$("state");s.className="state"+(v?" dirty":"");s.textContent=v?"● 有修改還沒儲存":(src=="data"?"已儲存":"")}
 
 function toModel(){var m={days:{},notes:DEFAULT_NOTES};Object.keys(days).forEach(function(d){var x=days[d];m.days[d]={ev:x.event?[x.event]:[],early:x.early?[x.early].concat(x.earlyNote?[x.earlyNote]:[]):[],late:x.late?[x.late].concat(x.lateNote?[x.lateNote]:[]):[]}});return m}
@@ -185,7 +196,9 @@ function drawSide(){
 }
 var _knownNames={};
 // 收集近幾個月出現過的人名，方便輸入
-(function(){var n=new Date();MONTHS.filter(function(M){var diff=(M.y-n.getFullYear())*12+M.m-(n.getMonth()+1);return diff>=-3&&diff<=0}).forEach(function(M){loadMonth(M).then(function(m){if(m)Object.keys(monthHours(m,M)).forEach(function(k){_knownNames[k]=1})})})})();
+// 收集 115 年 1 月到下個月所有班表出現過的人名，做成下拉選單
+function loadNames(){var n=new Date(),L=MONTHS.filter(function(M){var diff=(M.y-n.getFullYear())*12+M.m-(n.getMonth()+1);return M.yr>=115&&diff<=1});
+  return Promise.all(L.map(function(M){return loadMonth(M).then(function(m){if(m)Object.keys(monthHours(m,M)).forEach(function(k){if(!/^\d+$/.test(k))_knownNames[k]=1})},function(){})}))}
 
 // ===== 每週固定班 =====
 function mode(a){var c={},b="",n=0;a.forEach(function(v){if(!v)return;c[v]=(c[v]||0)+1;if(c[v]>n){n=c[v];b=v}});return b}
@@ -198,13 +211,14 @@ function drawTpl(){
     var e=mode(col[i].map(function(x){return OFF.test(x.early)&&x.early!="休館"?"":x.early}))||def[i][0];
     var l=mode(col[i].map(function(x){return OFF.test(x.late)&&!/無晚班|休館/.test(x.late)?"":x.late}))||def[i][1];
     var ln=mode(col[i].map(function(x){return x.lateNote}))||def[i][2];
-    h+='<b>'+WK[i]+'</b><input data-w="'+i+'" data-t="early" value="'+esc(e)+'" list="names"><input data-w="'+i+'" data-t="late" value="'+esc(l)+'" list="names"><input class="h2" data-w="'+i+'" data-t="lateNote" value="'+esc(ln)+'" list="lateNotes"><span class="h2"></span>';
+    h+='<b>'+WK[i]+'</b><select data-w="'+i+'" data-t="early">'+opts(e)+'</select><select data-w="'+i+'" data-t="late">'+opts(l)+'</select><input class="h2" data-w="'+i+'" data-t="lateNote" value="'+esc(ln)+'" list="lateNotes"><span class="h2"></span>';
   }
   $("tpl").innerHTML=h;
+  $("tpl").querySelectorAll("select").forEach(function(x){x.onchange=function(){other(x,function(){})}});
 }
 $("tplApply").onclick=function(){
   var M=MONTHS[cur],first=(new Date(M.y,M.m-1,1).getDay()+6)%7,t=[{},{},{},{},{},{},{}],keep=$("tplKeep").checked;
-  $("tpl").querySelectorAll("input").forEach(function(i){t[+i.dataset.w][i.dataset.t]=i.value.trim()});
+  $("tpl").querySelectorAll("input,select").forEach(function(i){t[+i.dataset.w][i.dataset.t]=i.value=="__other"?"":i.value.trim()});
   Object.keys(days).forEach(function(d){var x=days[d],w=(first+(+d)-1)%7;
     if(keep&&(x.event||/不須值勤|休館/.test(x.early+x.late))&&w!=6)return;
     x.early=t[w].early;x.late=t[w].late;x.lateNote=t[w].lateNote;
