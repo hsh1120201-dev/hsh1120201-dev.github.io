@@ -48,6 +48,7 @@ select{font:inherit;padding:.4em .6em;border-radius:10px;border:1px solid #ccc;b
 .notes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:1.2em}
 .notes div{background:#fff;border-radius:12px;padding:12px 16px;white-space:pre-line;font-size:.9em;color:#555;box-shadow:0 1px 4px rgba(0,0,0,.05)}
 .summary{margin-top:1.2em;background:#fff;border-radius:12px;padding:12px 16px;font-size:.9em;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.hint{color:var(--mute);font-size:.82em;margin:.6em 0 0}
 .summary h3{margin:0 0 .4em;font-size:1em}
 .summary table{border-collapse:collapse;width:100%}
 .summary td,.summary th{padding:4px 8px;border-bottom:1px solid #eee;text-align:left}
@@ -70,7 +71,7 @@ footer a{color:var(--b)}
 <main>
 <header><h1>基地班表</h1><p class="sub">新竹社會創新基地・早班／晚班值勤</p></header>
 <div class="bar">
-  <select id="yr"><option value="115">115年</option><option value="116">116年</option></select>
+  <select id="yr"><option value="115">115年</option><option value="116">116年</option><option value="117">117年</option></select>
   <div class="tabs" id="tabs"></div>
   <label>只看 <select id="who"><option value="">全部人員</option></select></label>
 </div>
@@ -85,121 +86,55 @@ footer a{color:var(--b)}
 <div class="cal" id="cal"></div>
 <div class="notes" id="notes"></div>
 <div class="summary" id="summary" hidden></div>
-<footer>資料即時讀取自「2026社創基地班表」試算表，改試算表後重新整理即可更新｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
+<footer><a href="admin.html">班表後台</a>｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
 </main>
+<script src="config.js"></script>
+<script src="common.js"></script>
 <script>
-var SHEET_ID="1bNoY0xiXiCuwJMWQ_g6ngQIGWtEgLuJILyS3-9ETBW4";
-// 要顯示的月份：sheet＝試算表分頁名稱，check＝分頁標題要包含的字（避免抓錯分頁）
-var MONTHS=[];
-// 115年：分頁名稱「1月」～「12月」；116年起：分頁名稱「116年1月」～「116年12月」（在試算表新增分頁就會出現）
-for(var i=1;i<=12;i++)MONTHS.push({yr:115,label:i+"月",y:2026,m:i,sheet:i+"月",check:"115年"+i+"月"});
-for(var i=1;i<=12;i++)MONTHS.push({yr:116,label:i+"月",y:2027,m:i,sheet:"116年"+i+"月",check:"116年"+i+"月",draft:i==1?draftJan:null});
-var OFF=/^(休館|無晚班|不須值勤)$/;
-var WK="一二三四五六日";
-var cache={},cur=0;
+var MONTHS=monthList(),cur=0;
 function $(id){return document.getElementById(id)}
 $("src").href="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/edit";
-
-function parseCSV(t){var rows=[],row=[],f="",q=false;for(var i=0;i<t.length;i++){var c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==','){row.push(f);f=""}else if(c=='\n'){row.push(f);rows.push(row);row=[];f=""}else if(c!='\r')f+=c}if(f||row.length){row.push(f);rows.push(row)}return rows}
-
-// 把試算表的月曆格式轉成 {days:{日:{ev,early:[],late:[]}}, notes:[]}
-function parseGrid(rows,check){
-  var g=function(r,c){return ((rows[r]||[])[c]||"").trim()};
-  var all=rows.map(function(r){return r.join(" ")}).join("\n");
-  if(check&&all.indexOf(check)<0)return null;
-  var hr=-1,starts=[];
-  for(var r=0;r<rows.length&&hr<0;r++)for(var c=0;c<rows[r].length;c++){if(g(r,c)=="一"&&g(r,c+6)=="日"){hr=r;starts.push(c);c+=6}}
-  if(hr<0)return null;
-  var model={days:{},notes:[]};
-  starts.forEach(function(s,si){
-    var key=si==0?"early":"late",cell=null;
-    for(var r=hr+1;r<rows.length;r++){
-      var cells=[];for(var i=0;i<7;i++)cells.push(g(r,s+i));
-      if(cells.some(function(x){return x.indexOf("※")>=0}))break;
-      var off=null,ok=true,any=false,parsed=[];
-      cells.forEach(function(x,i){if(!x){parsed.push(null);return}any=true;var m=x.match(/^([\s\S]*?)(\d{1,2})$/);if(!m||+m[2]<1||+m[2]>31){ok=false;return}var o=+m[2]-i;if(off===null)off=o;else if(off!==o)ok=false;parsed.push({n:+m[2],ev:m[1].trim()})});
-      if(any&&ok){cell=parsed.map(function(p){if(!p)return null;var d=model.days[p.n]||(model.days[p.n]={ev:[],early:[],late:[]});if(p.ev&&d.ev.indexOf(p.ev)<0)d.ev.push(p.ev);return d});continue}
-      if(!cell)continue;
-      cells.forEach(function(x,i){if(x&&cell[i])cell[i][key].push(x)});
-    }
-  });
-  rows.forEach(function(r){r.forEach(function(x){x=x.trim();if(x.indexOf("※")>=0&&model.notes.indexOf(x)<0)model.notes.push(x)})});
-  return model;
-}
-
-// 116年1月草稿：照 115年12月模式（週一～四 丘建宇／嚴柏安 B、週五 王鈞／吳亮廷 B(補)、週六有活動才排、週日休館、1/1 元旦）
-function draftJan(){
-  var m={days:{},notes:["※周一至周五值勤時間9:00-16:30，周六值勤時間9:00-18:00\n※休息時間為半小時\n※週六早班有活動／場租才排","※晚班值勤時間\nA時段：16:00-20:00\nB時段：16:30-20:00"]};
-  for(var d=1;d<=31;d++){var wd=(new Date(2027,0,d).getDay()+6)%7,x={ev:[],early:[],late:[]};
-    if(d==1){x.early=["不須值勤","元旦國定假日"];x.late=["不須值勤","元旦國定假日"]}
-    else if(wd==6){x.early=["休館"];x.late=["休館"]}
-    else if(wd==5){x.early=["待定","有活動才排"];x.late=["無晚班"]}
-    else if(wd==4){x.early=["王鈞"];x.late=["吳亮廷","B時段(補)"]}
-    else{x.early=["丘建宇"];x.late=["嚴柏安","B時段"]}
-    m.days[d]=x}
-  return m;
-}
-
-function load(i){
-  var M=MONTHS[i];
-  if(cache[i])return Promise.resolve(cache[i]);
-  var url="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&headers=0&sheet="+encodeURIComponent(M.sheet);
-  return fetch(url).then(function(r){return r.text()}).then(function(t){
-    var m=parseGrid(parseCSV(t),M.check);
-    if(m){m.live=true;return cache[i]=m}
-    if(M.draft){m=M.draft();m.draft=true;return cache[i]=m}
-    var e=new Error("試算表還沒有「"+M.sheet+"」分頁，新增後重新整理就會顯示");e.nosheet=true;throw e;
-  }).catch(function(e){if(M.draft){var m=M.draft();m.draft=true;m.err=e.message;return m}throw e});
-}
-
 function shiftHTML(cls,label,lines){
-  if(!lines.length)return "";
+  if(!lines.length||!lines.join(""))return "";
   var p=lines[0],off=OFF.test(p);
   return '<div class="sh '+cls+(off?' off':'')+'"><span class="k">'+label+'</span><b>'+esc(p)+'</b>'+lines.slice(1).map(function(n){return '<span class="n">'+esc(n)+'</span>'}).join("")+'</div>';
 }
-function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
-
-function names(model){var s={};Object.keys(model.days).forEach(function(d){var x=model.days[d];[x.early,x.late].forEach(function(a){a.forEach(function(v){if(!OFF.test(v)&&!/時段|^\d|假日|節|有活動|待定|到班|^MeetTaipei$/.test(v)&&v.length<=4)s[v]=1})})});return Object.keys(s)}
-
 function render(){
   var M=MONTHS[cur];
   $("tabs").querySelectorAll("button").forEach(function(b){b.className=+b.dataset.i==cur?"on":""});
   $("status").className="status";$("status").textContent="讀取中…";
-  load(cur).then(function(model){
+  loadMonth(M).then(function(model){
     var st=$("status");
-    if(model.draft){st.className="status warn";st.textContent="這是依 12 月模式自動排的草稿（試算表還沒有「"+M.sheet+"」分頁）。在試算表新增同名分頁並填好後，這裡就會自動改顯示正式班表。"}
-    else st.textContent="已讀取試算表「"+M.sheet+"」分頁・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
-    var who=$("who").value,sel=$("who"),list=names(model);
-    sel.innerHTML='<option value="">全部人員</option>'+list.map(function(n){return '<option'+(n==who?' selected':'')+'>'+esc(n)+'</option>'}).join("");
-    if(list.indexOf(who)<0)who="";
+    if(!model){st.className="status warn";st.textContent="這個月還沒有班表，可以到後台排班。";$("cal").innerHTML="";$("notes").innerHTML="";$("summary").hidden=true;$("who").innerHTML='<option value="">全部人員</option>';return}
+    if(model.draft){st.className="status warn";st.textContent="這是依 12 月模式自動排的草稿，到後台按「儲存這個月」後就會變成正式班表。"}
+    else st.textContent=(model.fromData?"後台班表":"試算表「"+M.sheet+"」分頁")+"・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})+" 讀取";
+    var cnt=monthHours(model,M),list=Object.keys(cnt);
+    var who=$("who").value;if(list.indexOf(who)<0)who="";
+    $("who").innerHTML='<option value="">全部人員</option>'+list.map(function(n){return '<option'+(n==who?' selected':'')+'>'+esc(n)+'</option>'}).join("");
     var h=WK.split("").map(function(w,i){return '<div class="wd'+(i==6?' sun':'')+'">'+w+'</div>'}).join("");
     var first=(new Date(M.y,M.m-1,1).getDay()+6)%7,last=new Date(M.y,M.m,0).getDate(),now=new Date();
     for(var i=0;i<first;i++)h+='<div class="day empty"></div>';
-    var cnt={};
     for(var d=1;d<=last;d++){
       var x=model.days[d]||{ev:[],early:[],late:[]},wd=(first+d-1)%7;
       var hit=who&&(x.early[0]==who||x.late[0]==who);
-      if(x.early[0]&&!OFF.test(x.early[0]))cnt[x.early[0]]=cnt[x.early[0]]||{e:0,l:0},cnt[x.early[0]].e++;
-      if(x.late[0]&&!OFF.test(x.late[0]))cnt[x.late[0]]=cnt[x.late[0]]||{e:0,l:0},cnt[x.late[0]].l++;
       var cls="day"+(now.getFullYear()==M.y&&now.getMonth()+1==M.m&&now.getDate()==d?" today":"")+(who?(hit?" hit":" dim"):"");
       h+='<div class="'+cls+'"><div class="dh"><span class="dn">'+d+'</span><span class="dwk">（'+WK[wd]+'）</span>'+x.ev.map(function(e){return '<span class="ev">'+esc(e)+'</span>'}).join("")+'</div>'+shiftHTML("e","早",x.early)+shiftHTML("l","晚",x.late)+'</div>';
     }
     $("cal").innerHTML=h;
-    $("notes").innerHTML=model.notes.map(function(n){return '<div>'+esc(n)+'</div>'}).join("");
-    var keys=Object.keys(cnt).filter(function(k){return list.indexOf(k)>=0});
-    $("summary").hidden=!keys.length;
-    $("summary").innerHTML='<h3>本月班數</h3><table><tr><th>人員</th><th>早班</th><th>晚班</th></tr>'+keys.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td></tr>'}).join("")+'</table>';
-  }).catch(function(e){$("status").className="status warn";$("status").textContent=e.nosheet?e.message:"讀不到班表："+e.message;$("cal").innerHTML="";$("notes").innerHTML="";$("summary").hidden=true});
+    $("notes").innerHTML=(model.notes||[]).map(function(n){return '<div>'+esc(n)+'</div>'}).join("");
+    var tot=0;list.forEach(function(k){tot+=cnt[k].h});
+    $("summary").hidden=!list.length;
+    $("summary").innerHTML='<h3>本月班數與時數</h3><table><tr><th>人員</th><th>早班</th><th>晚班</th><th>時數</th></tr>'+list.map(function(k){return '<tr'+(k==who?' style="background:#e8f1fa"':'')+'><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td><b>'+cnt[k].h+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th></tr></table><p class="hint">時數依當月備註的值勤時間計算（早班扣休息半小時；晚班沒寫時段當 B 時段；格子裡寫「15:00-20:00」或「17:00到班」會照寫的算）。</p>';
+  });
 }
 function drawTabs(){var yr=MONTHS[cur].yr;$("yr").value=yr;$("tabs").innerHTML=MONTHS.map(function(M,i){return M.yr==yr?'<button type="button" data-i="'+i+'">'+M.label+'</button>':""}).join("")}
-$("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;cur=+b.dataset.i;try{localStorage.setItem("sched-month2",cur)}catch(_){}render()});
+$("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;cur=+b.dataset.i;try{localStorage.setItem("sched-month3",cur)}catch(_){}render()});
 $("yr").addEventListener("change",function(){var yr=+this.value,m=MONTHS[cur].m;MONTHS.forEach(function(M,i){if(M.yr==yr&&M.m==m)cur=i});drawTabs();render()});
 $("who").addEventListener("change",render);
 (function(){var n=new Date(),k=-1;MONTHS.forEach(function(M,i){if(M.y==n.getFullYear()&&M.m==n.getMonth()+1)k=i});
-  try{var s=localStorage.getItem("sched-month2");if(s!==null&&MONTHS[+s])k=+s}catch(_){}
+  try{var s=localStorage.getItem("sched-month3");if(s!==null&&MONTHS[+s])k=+s}catch(_){}
   cur=k>=0?k:0})();
-drawTabs();
-render();
+drawTabs();render();
 </script>
 </body>
 </html>
