@@ -21,6 +21,9 @@ h2{font-size:1.05em;margin:1.6em 0 .6em;padding-left:.6em;border-left:5px solid 
 .item b{display:block;font-size:1.02em}
 .item span{display:block;color:#777;font-size:.85em;margin-top:4px}
 footer{text-align:center;color:#888;font-size:.85em;margin-top:2.5em}
+.gate{background:rgba(255,255,255,.97);border-radius:16px;padding:28px 16px;text-align:center;max-width:420px;margin:1em auto;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+#gsi-btn{display:flex;justify-content:center;min-height:44px}.msg{color:#c0392b;font-size:.9em;min-height:1.2em}
+.who{text-align:center;color:#888;font-size:.85em}.who a{color:#0070BA;cursor:pointer}
 </style>
 </head>
 <body>
@@ -39,12 +42,27 @@ footer{text-align:center;color:#888;font-size:.85em;margin-top:2.5em}
 </svg></div>
 <main>
 <header><h1>內部人員入口</h1><p class="sub">新竹社會創新基地・各系統與後台連結</p></header>
-<section><h2 style="--c:#EC5415">活動報名系統</h2><div class="grid"><a class="item" href="/activity/"><b>前台・活動報名</b><span>民眾報名、取消、填回饋</span></a><a class="item" href="/activity/admin.html"><b>報名管理後台</b><span>新增活動、看名單、匯出、EDM</span></a><a class="item" href="/activity/tv.html"><b>活動電視牆</b><span>大廳電視輪播報名中活動</span></a></div></section>
+<div id="gate" class="gate"><p>請用已授權的 Google 帳號登入</p><div id="gsi-btn"></div><p id="gsi-msg" class="msg"></p></div>
+<div id="links" hidden></div>
+<template id="tpl"><section><h2 style="--c:#EC5415">活動報名系統</h2><div class="grid"><a class="item" href="/activity/"><b>前台・活動報名</b><span>民眾報名、取消、填回饋</span></a><a class="item" href="/activity/admin.html"><b>報名管理後台</b><span>新增活動、看名單、匯出、EDM</span></a><a class="item" href="/activity/tv.html"><b>活動電視牆</b><span>大廳電視輪播報名中活動</span></a></div></section>
 <section><h2 style="--c:#0070BA">進駐團隊公告欄</h2><div class="grid"><a class="item" href="/board/"><b>公告欄</b><span>進駐團隊看活動、參訪、花絮</span></a><a class="item" href="/board/admin.html"><b>公告欄管理</b><span>新增貼文、團隊活動、照片</span></a></div></section>
 <section><h2 style="--c:#F9B72F">兩基地待辦</h2><div class="grid"><a class="item" href="/two-base-todo/"><b>待辦追蹤</b><span>社創＋青創待辦事項</span></a><a class="item" href="/two-base-todo/index.html#kpi"><b>月會 KPI 達成表</b><span>匯出 PNG／Excel</span></a><a class="item" href="/two-base-todo/tv.html"><b>待辦電視牆</b><span>辦公室電視顯示待辦</span></a></div></section>
 <section><h2 style="--c:#6b7a8f">表單</h2><div class="grid"><a class="item" href="https://docs.google.com/forms/d/e/1FAIpQLScaXr4F0QR0A-KGe8OSkfuj42kgWBfYEam1XUkiTRqIBmj4uQ/viewform" target="_blank" rel="noopener"><b>進駐團隊意見箱</b><span>團隊意見回饋</span></a><a class="item" href="https://docs.google.com/forms/d/e/1FAIpQLScrMShGvC0ex5igQXjCpkhZ9pznWdEHXjDQ9VGPujIZ1LgDUw/viewform" target="_blank" rel="noopener"><b>系統使用意見調查</b><span>三個網站使用建議</span></a></div></section>
 <section><h2 style="--c:#6b7a8f">對外管道與工具</h2><div class="grid"><a class="item" href="https://hys.hsinchu.gov.tw/startupHub" target="_blank" rel="noopener"><b>社創基地官網（竹夢網）</b></a><a class="item" href="https://line.me/R/ti/p/@991xengs" target="_blank" rel="noopener"><b>LINE 官方帳號</b></a><a class="item" href="https://www.youtube.com/@hhsihub" target="_blank" rel="noopener"><b>YouTube 頻道</b></a><a class="item" href="https://search.google.com/search-console" target="_blank" rel="noopener"><b>Google Search Console</b><span>看 Google 搜尋收錄狀況</span></a></div></section>
+</template>
+<p id="who" class="who" hidden></p>
 <footer>基地電話 03-5593142 分機 3529｜本頁僅供內部使用，請勿對外分享</footer>
 </main>
+<script>
+var API="https://script.google.com/macros/s/AKfycbyRp9pfZlfnr-UiOJizY5ASMGFyHFLM8pzPBOV4QfUZyQOuaZQ6S-k7HS-63Kvji0Xrlw/exec";
+function $(id){return document.getElementById(id)}
+function api(a,d){return fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({action:a},d||{}))}).then(function(r){return r.json()}).catch(function(){throw new Error("連不上伺服器，請稍後再試")}).then(function(j){if(!j.ok)throw new Error(j.error||"登入失敗");return j})}
+function show(email){$("gate").hidden=true;var l=$("links");l.innerHTML="";l.appendChild($("tpl").content.cloneNode(true));l.hidden=false;var w=$("who");w.hidden=false;w.innerHTML=(email?email+"　":"")+'<a id="out">登出</a>';$("out").onclick=function(){try{sessionStorage.removeItem("must-admin");sessionStorage.removeItem("must-admin-email")}catch(e){}location.reload()}}
+function onCred(r){$("gsi-msg").textContent="驗證中…";api("googleLogin",{credential:r.credential}).then(function(j){try{sessionStorage.setItem("must-admin",j.token);sessionStorage.setItem("must-admin-email",j.email||"")}catch(e){}show(j.email)}).catch(function(e){$("gsi-msg").textContent=e.message})}
+(function(){var t=null,em="";try{t=sessionStorage.getItem("must-admin");em=sessionStorage.getItem("must-admin-email")||""}catch(e){}
+if(t)return show(em);
+api("loginConfig").then(function(j){if(!j.clientId){$("gsi-msg").textContent="尚未設定 Google 登入";return}
+var sc=document.createElement("script");sc.src="https://accounts.google.com/gsi/client";sc.async=true;sc.onload=function(){google.accounts.id.initialize({client_id:j.clientId,callback:onCred,ux_mode:"popup",auto_select:false});google.accounts.id.renderButton($("gsi-btn"),{theme:"outline",size:"large",text:"signin_with",shape:"pill",locale:"zh-TW",width:260})};document.head.appendChild(sc)}).catch(function(e){$("gsi-msg").textContent=e.message})})();
+</script>
 </body>
 </html>
