@@ -168,7 +168,7 @@ function lowItems_() {
       if (min !== '' && !isNaN(parseFloat(min))) min = parseFloat(min);
       else if (/採購/.test(r[8]) && (m = String(r[8]).match(/剩\s*(\d+)\s*\S?\s*時/))) min = +m[1];
       else return;
-      if (stock <= min) out.push({ key: r[2], text: (cat ? '【' + cat + '】' : '') + r[2] + '：庫存 ' + stock + ' ' + r[3] + '（最低量 ' + min + '）' + (r[7] ? '・' + r[7] : '') });
+      if (min > 0 && stock <= min) out.push({ key: r[2], text: (cat ? '【' + cat + '】' : '') + r[2] + '：庫存 ' + stock + ' ' + r[3] + '（最低量 ' + min + '）' + (r[7] ? '・' + r[7] : '') });
     } else if (r[0] && !r[1] && !/照片|品項總數|＊|新竹社創|管理清單/.test(r[0])) cat = String(r[0]).replace(/（.*?）/g, '').trim();
   });
   return out;
