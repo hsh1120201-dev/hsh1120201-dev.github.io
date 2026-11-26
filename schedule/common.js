@@ -123,3 +123,48 @@ function monthHours(model,M){
       var c=cnt[p]||(cnt[p]={e:0,l:0,h:0});c[k[1]]++;c.h=Math.round((c.h+h)*100)/100})}
   return cnt;
 }
+
+// ===== 國定假日（含補假）：依《紀念日及節日實施條例》規則每年自動算 =====
+function holidays(Y){
+  var out={},lf=new Intl.DateTimeFormat("zh-TW-u-ca-chinese",{month:"numeric",day:"numeric"});
+  function key(d){return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
+  function D(y,m,d){return new Date(y,m-1,d)}
+  function add(d,n){return new Date(d.getFullYear(),d.getMonth(),d.getDate()+n)}
+  function lunar(d){var p=lf.formatToParts(d),m="",dd="";p.forEach(function(x){if(x.type=="month")m=x.value;if(x.type=="day")dd=x.value});return{m:m,d:+dd}}
+  // 找農曆日期（在國曆範圍內搜尋）
+  // 2026–2040 農曆節日直接查表（瀏覽器內建農曆偶爾差一天），之後的年份才用瀏覽器換算
+  var T={cny:"2026-02-17 2027-02-06 2028-01-26 2029-02-13 2030-02-03 2031-01-23 2032-02-11 2033-01-31 2034-02-19 2035-02-08 2036-01-28 2037-02-15 2038-02-04 2039-01-24 2040-02-12",
+    dw:"2026-06-19 2027-06-09 2028-05-28 2029-06-16 2030-06-05 2031-06-24 2032-06-12 2033-06-01 2034-06-20 2035-06-10 2036-05-30 2037-06-18 2038-06-07 2039-05-27 2040-06-14",
+    zq:"2026-09-25 2027-09-15 2028-10-03 2029-09-22 2030-09-12 2031-10-01 2032-09-19 2033-09-08 2034-09-27 2035-09-16 2036-10-04 2037-09-24 2038-09-13 2039-10-02 2040-09-20"};
+  function tab(k,y){var m=T[k].match(new RegExp(y+"-(\\d\\d)-(\\d\\d)"));return m?D(y,+m[1],+m[2]):null}
+  function findLunar(y,lm,ld,from,to){var t=lm==1?tab("cny",y):lm==5?tab("dw",y):tab("zq",y);if(t)return t;for(var d=from;d<=to;d=add(d,1)){var l=lunar(d);if(l.m===String(lm)&&l.d===ld)return d}return null}
+  var base={},list=[];
+  function fixed(y){
+    var r=[[D(y,1,1),"元旦"],[D(y,2,28),"和平紀念日"],[D(y,4,4),"兒童節"],[D(y,5,1),"勞動節"],[D(y,9,28),"教師節"],[D(y,10,10),"國慶日"],[D(y,10,25),"光復節"],[D(y,12,25),"行憲紀念日"]];
+    var yy=y%100,q=Math.floor(yy*0.2422+4.81)-Math.floor(yy/4);r.push([D(y,4,q),"清明節"]);
+    var dw=findLunar(y,5,5,D(y,5,20),D(y,6,30));if(dw)r.push([dw,"端午節"]);
+    var zq=findLunar(y,8,15,D(y,9,1),D(y,10,10));if(zq)r.push([zq,"中秋節"]);
+    return r;
+  }
+  function cny(y){ // 回傳 [小年夜,除夕,初一,初二,初三]
+    var c1=findLunar(y,1,1,D(y,1,20),D(y,2,21));if(!c1)return[];
+    return [[add(c1,-2),"春節（小年夜）"],[add(c1,-1),"春節（除夕）"],[c1,"春節（初一）"],[add(c1,1),"春節（初二）"],[add(c1,2),"春節（初三）"]];
+  }
+  [Y,Y+1].forEach(function(y){
+    var used={};
+    function mark(d,n){var k=key(d);if(!used[k]){used[k]=n;if(d.getFullYear()==Y)out[k]=n}}
+    var c=cny(y);c.forEach(function(x){mark(x[0],x[1])});
+    var f=fixed(y);f.forEach(function(x){if(!used[key(x[0])])mark(x[0],x[1]);else mark(x[0],used[key(x[0])])});
+    // 補假
+    if(c.length){var last=c[4][0];c.forEach(function(x){var w=x[0].getDay();if(w==0||w==6){do{last=add(last,1)}while(last.getDay()==0||last.getDay()==6||used[key(last)]);mark(last,x[1].replace(/（.*）/,"")+"補假")}})}
+    f.forEach(function(x){var d=x[0],w=d.getDay(),n=x[1];
+      // 兒童節與清明同一天：前一天放假，但遇星期四改後一天
+      if(n=="兒童節"&&f.filter(function(z){return key(z[0])==key(d)}).length>1){var alt=w==4?add(d,1):add(d,-1);if(alt.getDay()==0)alt=add(alt,1);if(alt.getDay()==6)alt=add(alt,-1);mark(alt,"兒童節補假");return}
+      if(w==6){var p=add(d,-1);while(used[key(p)]&&used[key(p)].indexOf("補假")<0&&p.getDay()!=6)p=add(p,-1);mark(p,n+"補假")}
+      else if(w==0){var p=add(d,1);while(p.getDay()==0||p.getDay()==6||used[key(p)])p=add(p,1);mark(p,n+"補假")}
+    });
+  });
+  return out;
+}
+var _hol={};
+function holidayName(y,m,d){if(!_hol[y])_hol[y]=holidays(y);return _hol[y][y+"-"+pad(m)+"-"+pad(d)]||""}

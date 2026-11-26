@@ -41,6 +41,8 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 .ed td.d{white-space:nowrap;font-weight:700;width:5.5em}
 .ed td.d small{color:var(--mute);font-weight:400}
 .ed tr.sun td{background:#f7f5f0}
+.ed tr.hol td{background:#fdecee}
+.ed .holn{color:#b3261e;font-weight:700}
 .ed tr.sat td.d{color:var(--b)}
 .ed tr.sun td.d{color:var(--r)}
 .ed select{font:inherit;width:100%;padding:.35em .3em;border:1px solid #e3dccd;border-radius:7px;background:#fff}
@@ -97,7 +99,7 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
   <details id="tplBox">
     <summary>套用每週固定班（快速排整個月）</summary>
     <div class="tpl" id="tpl"></div>
-    <label><input type="checkbox" id="tplKeep" checked> 不覆蓋已經寫「不須值勤」、「休館」或有活動的日子</label><br>
+    <label><input type="checkbox" id="tplKeep" checked> 不覆蓋已經寫「不須值勤」、「休館」或有活動的日子</label><br><span class="hint">國定假日（含補假）每年自動算，套用後會自動設成「休館」。</span><br>
     <button class="sec" id="tplApply" type="button" style="margin-top:.6em">套用到這個月</button>
     <p class="hint">已自動帶入這個月最常見的排法，改好後按套用，再個別調整國定假日或換班。</p>
   </details>
@@ -111,7 +113,7 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 </main>
 <script src="/backend/config.js?v=2"></script>
 <script src="/backend/admin.js?v=4"></script>
-<script src="common.js?v=3"></script>
+<script src="common.js?v=4"></script>
 <script>
 var MONTHS=monthList(),cur=0,days={},dirty=false,src="";
 var STATUS=["休館","不須值勤","無晚班","待定"];
@@ -161,14 +163,20 @@ function load(){
     else if(model.fromData){src="data";info.className="info ok";info.textContent="這是後台已儲存的班表"+(model.updated?"（最後更新 "+model.updated+(model.by?"，"+model.by:"")+"）":"")+"。"}
     else if(model.draft){src="draft";info.textContent="目前顯示的是自動排的草稿，按「儲存這個月」後才會成為正式班表。"}
     else{src="sheet";info.textContent="目前顯示的是試算表「"+M.sheet+"」分頁的舊班表（唯讀）。在這裡修改並按「儲存這個月」後，之後就以後台為準。"}
-    setDirty(false);drawRows();drawTpl();drawSide();
+    setDirty(false);
+    if(src=="empty"||src=="draft"){if(applyHol())setDirty(true)}
+    drawRows();drawTpl();drawSide();
   });
 }
+// ===== 國定假日自動休館 =====
+function applyHol(){var M=MONTHS[cur],n=0;Object.keys(days).forEach(function(d){var h=holidayName(M.y,M.m,+d);if(!h)return;var x=days[d];
+  x.early="休館";x.earlyNote="";x.late="休館";x.lateNote="";if(x.event.indexOf(h.replace("補假",""))<0)x.event=x.event?x.event+"、"+h:h;n++});return n}
 // ===== 編輯 =====
 function drawRows(){
   var M=MONTHS[cur],first=(new Date(M.y,M.m-1,1).getDay()+6)%7,h="";
   Object.keys(days).forEach(function(d){var x=days[d],wd=(first+(+d)-1)%7;
-    h+='<tr data-d="'+d+'" class="'+(wd==6?'sun':wd==5?'sat':'')+'"><td class="d">'+M.m+'/'+d+' <small>'+WK[wd]+'</small></td>'+
+    var hn=holidayName(M.y,M.m,+d);
+    h+='<tr data-d="'+d+'" class="'+(wd==6?'sun':wd==5?'sat':'')+(hn?' hol':'')+'"><td class="d">'+M.m+'/'+d+' <small>'+WK[wd]+'</small>'+(hn?'<br><small class="holn">'+esc(hn)+'</small>':'')+'</td>'+
       inp("ev","event",x.event,"活動／假日")+sel("e","early",x.early,"早班")+inp("e","earlyNote",x.earlyNote,"早班備註")+sel("l","late",x.late,"晚班")+inp("l","lateNote",x.lateNote,"晚班時段","lateNotes")+'</tr>'});
   $("rows").innerHTML=h;styleOff();
 }
@@ -223,7 +231,7 @@ $("tplApply").onclick=function(){
     if(keep&&(x.event||/不須值勤|休館/.test(x.early+x.late))&&w!=6)return;
     x.early=t[w].early;x.late=t[w].late;x.lateNote=t[w].lateNote;
     if(OFF.test(x.early))x.earlyNote="";});
-  setDirty(true);drawRows();drawSide();
+  applyHol();setDirty(true);drawRows();drawSide();
 };
 
 // ===== 儲存 =====

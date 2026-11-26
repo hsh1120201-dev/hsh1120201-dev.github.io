@@ -36,6 +36,7 @@ select{font:inherit;padding:.4em .6em;border-radius:10px;border:1px solid #ccc;b
 .dn{font-weight:800;font-size:1.1em}
 .dwk{display:none;color:var(--mute);font-size:.85em}
 .ev{font-size:.75em;background:#fde8dd;color:#a33a0c;border-radius:6px;padding:1px 6px;font-weight:700}
+.ev.hol{background:#f8d7da;color:#8a1c24}
 .sh{border-radius:7px;padding:3px 6px;font-size:.88em;line-height:1.35}
 .sh.e{background:#fff5df;border-left:4px solid var(--y)}
 .sh.l{background:#e8f1fa;border-left:4px solid var(--b)}
@@ -79,6 +80,7 @@ footer a{color:var(--b)}
   <span><i class="dot" style="background:var(--y)"></i>早班</span>
   <span><i class="dot" style="background:var(--b)"></i>晚班</span>
   <span><i class="dot" style="background:#fde8dd"></i>活動／場租</span>
+  <span><i class="dot" style="background:#f8d7da"></i>國定假日</span>
   <span><i class="dot" style="background:#ddd"></i>休館・不須值勤・無晚班</span>
   <span><i class="dot" style="background:var(--r)"></i>今天</span>
 </div>
@@ -89,7 +91,7 @@ footer a{color:var(--b)}
 <footer><a href="admin.html">班表後台</a>｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
 </main>
 <script src="/backend/config.js?v=2"></script>
-<script src="common.js?v=3"></script>
+<script src="common.js?v=4"></script>
 <script>
 var MONTHS=monthList(),cur=0;
 function $(id){return document.getElementById(id)}
@@ -116,9 +118,10 @@ function render(){
     for(var i=0;i<first;i++)h+='<div class="day empty"></div>';
     for(var d=1;d<=last;d++){
       var x=model.days[d]||{ev:[],early:[],late:[]},wd=(first+d-1)%7;
+      var hn=holidayName(M.y,M.m,d),evs=x.ev.slice();if(hn&&!evs.some(function(e){return e.indexOf(hn.replace("補假",""))>=0}))evs.push(hn);
       var hit=who&&(x.early[0]==who||x.late[0]==who);
       var cls="day"+(now.getFullYear()==M.y&&now.getMonth()+1==M.m&&now.getDate()==d?" today":"")+(who?(hit?" hit":" dim"):"");
-      h+='<div class="'+cls+'"><div class="dh"><span class="dn">'+d+'</span><span class="dwk">（'+WK[wd]+'）</span>'+x.ev.map(function(e){return '<span class="ev">'+esc(e)+'</span>'}).join("")+'</div>'+shiftHTML("e","早",x.early)+shiftHTML("l","晚",x.late)+'</div>';
+      h+='<div class="'+cls+'"><div class="dh"><span class="dn">'+d+'</span><span class="dwk">（'+WK[wd]+'）</span>'+evs.map(function(e){return '<span class="ev'+(e==hn?' hol':'')+'">'+esc(e)+'</span>'}).join("")+'</div>'+shiftHTML("e","早",x.early)+shiftHTML("l","晚",x.late)+'</div>';
     }
     $("cal").innerHTML=h;
     $("notes").innerHTML=(model.notes||[]).map(function(n){return '<div>'+esc(n)+'</div>'}).join("");
