@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>基地班表｜新竹社會創新基地</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<style>
+:root{--y:#F9B72F;--r:#EC5415;--b:#0070BA;--bg:#FBF7EF;--card:#fff;--ink:#2b2b2b;--mute:#777;--line:#eadfca;--off:#f1efea}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg);min-height:100vh}
+main{max-width:1180px;margin:0 auto;padding:2em 16px 3em}
+header{text-align:center;margin-bottom:1.2em}
+h1{font-size:clamp(1.5em,4vw,2em);margin:.2em 0;letter-spacing:.06em}
+.sub{color:var(--mute);margin:0;font-size:.95em}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin:1em 0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{border:2px solid var(--y);background:#fff;color:var(--ink);border-radius:999px;padding:.45em 1.1em;font:inherit;font-weight:700;cursor:pointer}
+.tabs button.on{background:var(--y)}
+select{font:inherit;padding:.4em .6em;border-radius:10px;border:1px solid #ccc;background:#fff}
+.legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:.85em;color:var(--mute);margin-bottom:.8em}
+.dot{display:inline-block;width:.8em;height:.8em;border-radius:3px;vertical-align:-.05em;margin-right:4px}
+.status{text-align:center;color:var(--mute);font-size:.9em;min-height:1.3em}
+.status.warn{color:#b34700;background:#fff3e0;border-radius:10px;padding:.5em 1em;max-width:720px;margin:0 auto .8em}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.wd{text-align:center;font-weight:700;padding:.4em 0;background:var(--y);border-radius:8px}
+.wd.sun{background:#f3d9a0}
+.day{background:var(--card);border-radius:10px;padding:6px 7px;min-height:118px;box-shadow:0 1px 4px rgba(0,0,0,.06);border:2px solid transparent;display:flex;flex-direction:column;gap:4px}
+.day.empty{background:transparent;box-shadow:none}
+.day.today{border-color:var(--r)}
+.day.dim{opacity:.35}
+.day.hit{border-color:var(--b);box-shadow:0 0 0 3px rgba(0,112,186,.15)}
+.dh{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.dn{font-weight:800;font-size:1.1em}
+.dwk{display:none;color:var(--mute);font-size:.85em}
+.ev{font-size:.75em;background:#fde8dd;color:#a33a0c;border-radius:6px;padding:1px 6px;font-weight:700}
+.sh{border-radius:7px;padding:3px 6px;font-size:.88em;line-height:1.35}
+.sh.e{background:#fff5df;border-left:4px solid var(--y)}
+.sh.l{background:#e8f1fa;border-left:4px solid var(--b)}
+.sh.off{background:var(--off);border-left-color:#ccc;color:#999}
+.sh .k{font-size:.75em;color:var(--mute);margin-right:3px}
+.sh b{font-weight:700}
+.sh .n{display:block;font-size:.78em;color:#8a6d3b}
+.sh.l .n{color:#3d6a91}
+.sh.off .n{color:#a07b70}
+.notes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:1.2em}
+.notes div{background:#fff;border-radius:12px;padding:12px 16px;white-space:pre-line;font-size:.9em;color:#555;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.summary{margin-top:1.2em;background:#fff;border-radius:12px;padding:12px 16px;font-size:.9em;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.summary h3{margin:0 0 .4em;font-size:1em}
+.summary table{border-collapse:collapse;width:100%}
+.summary td,.summary th{padding:4px 8px;border-bottom:1px solid #eee;text-align:left}
+.summary th{color:var(--mute);font-weight:600}
+footer{text-align:center;color:#888;font-size:.85em;margin-top:2em}
+footer a{color:var(--b)}
+@media (max-width:760px){
+  .cal{grid-template-columns:1fr;gap:8px}
+  .wd,.day.empty{display:none}
+  .day{min-height:0;flex-direction:row;flex-wrap:wrap;align-items:flex-start}
+  .dh{width:100%}
+  .dwk{display:inline}
+  .sh{flex:1 1 45%}
+  .notes{grid-template-columns:1fr}
+}
+@media print{body{background:#fff}.bar,.legend,footer,.summary{display:none}.day{box-shadow:none;border:1px solid #ddd;min-height:90px}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>基地班表</h1><p class="sub">新竹社會創新基地・早班／晚班值勤</p></header>
+<div class="bar">
+  <div class="tabs" id="tabs"></div>
+  <label>只看 <select id="who"><option value="">全部人員</option></select></label>
+</div>
+<div class="legend">
+  <span><i class="dot" style="background:var(--y)"></i>早班</span>
+  <span><i class="dot" style="background:var(--b)"></i>晚班</span>
+  <span><i class="dot" style="background:#fde8dd"></i>活動／場租</span>
+  <span><i class="dot" style="background:#ddd"></i>休館・不須值勤・無晚班</span>
+  <span><i class="dot" style="background:var(--r)"></i>今天</span>
+</div>
+<p class="status" id="status">讀取中…</p>
+<div class="cal" id="cal"></div>
+<div class="notes" id="notes"></div>
+<div class="summary" id="summary" hidden></div>
+<footer>資料即時讀取自「2026社創基地班表」試算表，改試算表後重新整理即可更新｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
+</main>
+<script>
+var SHEET_ID="1bNoY0xiXiCuwJMWQ_g6ngQIGWtEgLuJILyS3-9ETBW4";
+// 要顯示的月份：sheet＝試算表分頁名稱，check＝分頁標題要包含的字（避免抓錯分頁）
+var MONTHS=[
+  {label:"115年12月",y:2026,m:12,sheet:"12月",check:"115年12月"},
+  {label:"116年1月",y:2027,m:1,sheet:"116年1月",check:"116年1月",draft:draftJan}
+];
+var OFF=/^(休館|無晚班|不須值勤)$/;
+var WK="一二三四五六日";
+var cache={},cur=0;
+function $(id){return document.getElementById(id)}
+$("src").href="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/edit";
+
+function parseCSV(t){var rows=[],row=[],f="",q=false;for(var i=0;i<t.length;i++){var c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==','){row.push(f);f=""}else if(c=='\n'){row.push(f);rows.push(row);row=[];f=""}else if(c!='\r')f+=c}if(f||row.length){row.push(f);rows.push(row)}return rows}
+
+// 把試算表的月曆格式轉成 {days:{日:{ev,early:[],late:[]}}, notes:[]}
+function parseGrid(rows,check){
+  var g=function(r,c){return ((rows[r]||[])[c]||"").trim()};
+  var all=rows.map(function(r){return r.join(" ")}).join("\n");
+  if(check&&all.indexOf(check)<0)return null;
+  var hr=-1,starts=[];
+  for(var r=0;r<rows.length&&hr<0;r++)for(var c=0;c<rows[r].length;c++){if(g(r,c)=="一"&&g(r,c+6)=="日"){hr=r;starts.push(c);c+=6}}
+  if(hr<0)return null;
+  var model={days:{},notes:[]};
+  starts.forEach(function(s,si){
+    var key=si==0?"early":"late",cell=null;
+    for(var r=hr+1;r<rows.length;r++){
+      var cells=[];for(var i=0;i<7;i++)cells.push(g(r,s+i));
+      if(cells.some(function(x){return x.indexOf("※")>=0}))break;
+      var off=null,ok=true,any=false,parsed=[];
+      cells.forEach(function(x,i){if(!x){parsed.push(null);return}any=true;var m=x.match(/^([\s\S]*?)(\d{1,2})$/);if(!m||+m[2]<1||+m[2]>31){ok=false;return}var o=+m[2]-i;if(off===null)off=o;else if(off!==o)ok=false;parsed.push({n:+m[2],ev:m[1].trim()})});
+      if(any&&ok){cell=parsed.map(function(p){if(!p)return null;var d=model.days[p.n]||(model.days[p.n]={ev:[],early:[],late:[]});if(p.ev&&d.ev.indexOf(p.ev)<0)d.ev.push(p.ev);return d});continue}
+      if(!cell)continue;
+      cells.forEach(function(x,i){if(x&&cell[i])cell[i][key].push(x)});
+    }
+  });
+  rows.forEach(function(r){r.forEach(function(x){x=x.trim();if(x.indexOf("※")>=0&&model.notes.indexOf(x)<0)model.notes.push(x)})});
+  return model;
+}
+
+// 116年1月草稿：照 115年12月模式（週一～四 丘建宇／嚴柏安 B、週五 王鈞／吳亮廷 B(補)、週六有活動才排、週日休館、1/1 元旦）
+function draftJan(){
+  var m={days:{},notes:["※周一至周五值勤時間9:00-16:30，周六值勤時間9:00-18:00\n※休息時間為半小時\n※週六早班有活動／場租才排","※晚班值勤時間\nA時段：16:00-20:00\nB時段：16:30-20:00"]};
+  for(var d=1;d<=31;d++){var wd=(new Date(2027,0,d).getDay()+6)%7,x={ev:[],early:[],late:[]};
+    if(d==1){x.early=["不須值勤","元旦國定假日"];x.late=["不須值勤","元旦國定假日"]}
+    else if(wd==6){x.early=["休館"];x.late=["休館"]}
+    else if(wd==5){x.early=["待定","有活動才排"];x.late=["無晚班"]}
+    else if(wd==4){x.early=["王鈞"];x.late=["吳亮廷","B時段(補)"]}
+    else{x.early=["丘建宇"];x.late=["嚴柏安","B時段"]}
+    m.days[d]=x}
+  return m;
+}
+
+function load(i){
+  var M=MONTHS[i];
+  if(cache[i])return Promise.resolve(cache[i]);
+  var url="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&headers=0&sheet="+encodeURIComponent(M.sheet);
+  return fetch(url).then(function(r){return r.text()}).then(function(t){
+    var m=parseGrid(parseCSV(t),M.check);
+    if(m){m.live=true;return cache[i]=m}
+    if(M.draft){m=M.draft();m.draft=true;return cache[i]=m}
+    throw new Error("試算表找不到「"+M.sheet+"」分頁");
+  }).catch(function(e){if(M.draft){var m=M.draft();m.draft=true;m.err=e.message;return m}throw e});
+}
+
+function shiftHTML(cls,label,lines){
+  if(!lines.length)return "";
+  var p=lines[0],off=OFF.test(p);
+  return '<div class="sh '+cls+(off?' off':'')+'"><span class="k">'+label+'</span><b>'+esc(p)+'</b>'+lines.slice(1).map(function(n){return '<span class="n">'+esc(n)+'</span>'}).join("")+'</div>';
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+function names(model){var s={};Object.keys(model.days).forEach(function(d){var x=model.days[d];[x.early,x.late].forEach(function(a){a.forEach(function(v){if(!OFF.test(v)&&!/時段|^\d|假日|節|有活動|待定|到班|^MeetTaipei$/.test(v)&&v.length<=4)s[v]=1})})});return Object.keys(s)}
+
+function render(){
+  var M=MONTHS[cur];
+  $("tabs").querySelectorAll("button").forEach(function(b,i){b.className=i==cur?"on":""});
+  $("status").className="status";$("status").textContent="讀取中…";
+  load(cur).then(function(model){
+    var st=$("status");
+    if(model.draft){st.className="status warn";st.textContent="這是依 12 月模式自動排的草稿（試算表還沒有「"+M.sheet+"」分頁）。在試算表新增同名分頁並填好後，這裡就會自動改顯示正式班表。"}
+    else st.textContent="已讀取試算表「"+M.sheet+"」分頁・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+    var who=$("who").value,sel=$("who"),list=names(model);
+    sel.innerHTML='<option value="">全部人員</option>'+list.map(function(n){return '<option'+(n==who?' selected':'')+'>'+esc(n)+'</option>'}).join("");
+    if(list.indexOf(who)<0)who="";
+    var h=WK.split("").map(function(w,i){return '<div class="wd'+(i==6?' sun':'')+'">'+w+'</div>'}).join("");
+    var first=(new Date(M.y,M.m-1,1).getDay()+6)%7,last=new Date(M.y,M.m,0).getDate(),now=new Date();
+    for(var i=0;i<first;i++)h+='<div class="day empty"></div>';
+    var cnt={};
+    for(var d=1;d<=last;d++){
+      var x=model.days[d]||{ev:[],early:[],late:[]},wd=(first+d-1)%7;
+      var hit=who&&(x.early[0]==who||x.late[0]==who);
+      if(x.early[0]&&!OFF.test(x.early[0]))cnt[x.early[0]]=cnt[x.early[0]]||{e:0,l:0},cnt[x.early[0]].e++;
+      if(x.late[0]&&!OFF.test(x.late[0]))cnt[x.late[0]]=cnt[x.late[0]]||{e:0,l:0},cnt[x.late[0]].l++;
+      var cls="day"+(now.getFullYear()==M.y&&now.getMonth()+1==M.m&&now.getDate()==d?" today":"")+(who?(hit?" hit":" dim"):"");
+      h+='<div class="'+cls+'"><div class="dh"><span class="dn">'+d+'</span><span class="dwk">（'+WK[wd]+'）</span>'+x.ev.map(function(e){return '<span class="ev">'+esc(e)+'</span>'}).join("")+'</div>'+shiftHTML("e","早",x.early)+shiftHTML("l","晚",x.late)+'</div>';
+    }
+    $("cal").innerHTML=h;
+    $("notes").innerHTML=model.notes.map(function(n){return '<div>'+esc(n)+'</div>'}).join("");
+    var keys=Object.keys(cnt).filter(function(k){return list.indexOf(k)>=0});
+    $("summary").hidden=!keys.length;
+    $("summary").innerHTML='<h3>本月班數</h3><table><tr><th>人員</th><th>早班</th><th>晚班</th></tr>'+keys.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td></tr>'}).join("")+'</table>';
+  }).catch(function(e){$("status").className="status warn";$("status").textContent="讀不到班表："+e.message;$("cal").innerHTML=""});
+}
+$("tabs").innerHTML=MONTHS.map(function(M,i){return '<button type="button" data-i="'+i+'">'+M.label+'</button>'}).join("");
+$("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;cur=+b.dataset.i;try{localStorage.setItem("sched-month",cur)}catch(_){}render()});
+$("who").addEventListener("change",render);
+(function(){var n=new Date(),k=-1;MONTHS.forEach(function(M,i){if(M.y==n.getFullYear()&&M.m==n.getMonth()+1)k=i});
+  try{var s=localStorage.getItem("sched-month");if(s!==null&&MONTHS[+s])k=+s}catch(_){}
+  cur=k>=0?k:0})();
+render();
+</script>
+</body>
+</html>
