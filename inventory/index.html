@@ -88,8 +88,9 @@ function parseInv(rows){
   var items=[],cat="";
   rows.forEach(function(r){
     if(/^\d+$/.test(r[1]||"")&&r[2]){
-      var it={row:r._row,cat:cat,no:r[1],name:r[2],unit:r[3],stock:n(r[4]),use:n(r[5]),total:n(r[6]),where:r[7]||"",note:r[8]||"",flags:[]};
-      var th=it.note.match(/剩\s*(\d+)\s*\S?\s*時/);if(/採購/.test(it.note)&&th&&it.stock<=+th[1])it.flags.push(["buy",it.total==0?"已用完・要採購":"到採購量・要採購"]);
+      var it={row:r._row,cat:cat,no:r[1],name:r[2],unit:r[3],stock:n(r[4]),use:n(r[5]),total:n(r[6]),where:r[7]||"",note:r[8]||"",min:(r[9]||"").trim(),flags:[]};
+      var th=it.note.match(/剩\s*(\d+)\s*\S?\s*時/);it.lim=it.min!==""&&!isNaN(parseFloat(it.min))?parseFloat(it.min):(/採購/.test(it.note)&&th?+th[1]:null);
+      if(it.lim!=null&&it.stock<=it.lim)it.flags.push(["buy",it.stock<=0?"已用完・要採購":"到最低量・要採購"]);
       if(!it.where||/^\?|？|待確認/.test(it.where)||/找不到|不知道在哪/.test(it.note)||r[0]=="?")it.flags.push(["where","位置待確認"]);
       items.push(it);
     }else if(r[0]&&!r[1]&&!/照片|品項總數|＊|新竹社創|管理清單/.test(r[0])){cat=r[0].replace(/（.*?）/g,"").trim()}
@@ -111,7 +112,7 @@ function renderInv(){
   if(!shown.length){$("list").innerHTML='<p class="empty">沒有符合的品項</p>';return}
   var groups=[],gm={};shown.forEach(function(i){if(!gm[i.cat]){gm[i.cat]=[];groups.push(i.cat)}gm[i.cat].push(i)});
   var edit=Admin.on()&&!!data.inv[0]&&!!data.inv[0].row;
-  $("list").innerHTML=groups.map(function(g){return '<h2>'+esc(g||"未分類")+'（'+gm[g].length+'）'+(edit?' <button class="adm-edit" data-addcat="'+esc(g)+'">＋新增品項</button>':'')+'</h2><table><thead><tr><th>No.</th><th>品項</th><th class="num">庫存</th><th class="num">使用中</th><th class="num">總數</th><th>位置</th><th>備註</th></tr></thead><tbody>'+gm[g].map(function(i){
+  $("list").innerHTML=groups.map(function(g){return '<h2>'+esc(g||"未分類")+'（'+gm[g].length+'）'+(edit?' <button class="adm-edit" data-addcat="'+esc(g)+'">＋新增品項</button>':'')+'</h2><table><thead><tr><th>No.</th><th>品項</th><th class="num">庫存</th><th class="num">使用中</th><th class="num">總數</th><th class="num">最低量</th><th>位置</th><th>備註</th></tr></thead><tbody>'+gm[g].map(function(i){
     return '<tr><td class="no">'+esc(i.no)+'</td><td class="name">'+esc(i.name)+(edit&&i.row?' <button class="adm-edit" data-inv="'+items.indexOf(i)+'">編輯</button>':'')+'<br>'+i.flags.map(function(x){return '<span class="tag '+x[0]+'">'+x[1]+'</span>'}).join("")+'</td><td class="num" data-k="庫存">'+i.stock+' '+esc(i.unit)+'</td><td class="num" data-k="使用中">'+i.use+'</td><td class="num" data-k="總數">'+i.total+'</td><td data-k="位置">'+esc(i.where||"—")+'</td><td class="note"'+(i.note?' data-k="備註"':'')+'>'+esc(i.note)+'</td></tr>'}).join("")+'</tbody></table>'}).join("");
 }
 function renderKey(){
@@ -153,9 +154,10 @@ function invForm(i,cat,after){
     {k:"name",label:"品項名稱",value:i?i.name:""},
     {k:"no",label:"No.",value:i?i.no:"",half:1},{k:"unit",label:"單位",value:i?i.unit:"",half:1},
     {k:"stock",label:"庫存數量",type:"number",value:i?i.stock:0,half:1},{k:"use",label:"使用中數量",type:"number",value:i?i.use:0,half:1},
+    {k:"min",label:"最低量（庫存到這個數字就通知採購，空白＝不通知）",type:"number",value:i?(i.min!==""?i.min:(i.lim!=null?i.lim:"")):"",half:0},
     {k:"where",label:"位置",value:i?i.where:""},{k:"note",label:"備註",type:"textarea",value:i?i.note:""}],
     submit:function(v){if(!v.name.trim())throw new Error("請填品項名稱");
-      var vals={2:v.no,3:v.name,4:v.unit,5:v.stock||0,6:v.use||0,8:v.where,9:v.note};
+      var vals={2:v.no,3:v.name,4:v.unit,5:v.stock||0,6:v.use||0,8:v.where,9:v.note,10:v.min===""||v.min==null?"":v.min};
       return Admin.api(i?{action:"update",t:"inv",row:i.row,check:i.name,values:vals}:{action:"add",t:"inv",after:after,values:vals}).then(load)},
     del:i?function(){return Admin.api({action:"delete",t:"inv",row:i.row,check:i.name}).then(load)}:null});
 }

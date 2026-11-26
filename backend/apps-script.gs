@@ -8,16 +8,20 @@
  * 4. 部署 > 新增部署作業 > 類型「網頁應用程式」，執行身分「我」，存取權「所有人」> 部署，第一次會要求授權
  * 5. 把網頁應用程式網址貼到 GitHub 的 backend/config.js（BASE_API）
  *
+ * 6. 最低量通知：在編輯器選函式「開啟庫存通知」按執行一次（會要求寄信授權），之後每天 9 點檢查，網頁上改庫存也會馬上檢查
+ *
  * 班表存在本試算表的「班表資料」分頁（第一次儲存時自動建立），原本的月份分頁不會被改動。
  */
 var INVENTORY_ID = '1GaTYKBds0xFtv-ofYkMNryKFjWpA2sU1hYhiTAUxZ2I';
 var FINANCE_ID = '1uh2QXVU3uNwI5VTFAQvu71rm89IglIsWTef7B_6JkiI';
+// 最低量通知寄給誰（多人用逗號隔開）；留空＝寄給部署這支程式的 Google 帳號
+var NOTIFY_TO = '';
 // 活動報名系統的 Apps Script（Google 登入與後台帳號名單沿用這裡）
 var ACTIVITY_API = 'https://script.google.com/macros/s/AKfycbyRp9pfZlfnr-UiOJizY5ASMGFyHFLM8pzPBOV4QfUZyQOuaZQ6S-k7HS-63Kvji0Xrlw/exec';
 
 // 各表格：檔案、分頁、可以改的欄（從 1 開始）、用來確認是哪一列的欄
 var TABLES = {
-  inv: { file: function () { return SpreadsheetApp.openById(INVENTORY_ID); }, sheet: '倉儲清單', cols: [2, 3, 4, 5, 6, 8, 9], key: 3, sum: [7, 5, 6] },
+  inv: { file: function () { return SpreadsheetApp.openById(INVENTORY_ID); }, sheet: '倉儲清單', cols: [2, 3, 4, 5, 6, 8, 9, 10], key: 3, sum: [7, 5, 6], minCol: 10 },
   key: { file: function () { return SpreadsheetApp.openById(INVENTORY_ID); }, sheet: '鑰匙清冊', cols: [2, 3, 4, 5, 7, 8], key: 2, diff: [6, 4, 5] },
   out: { file: function () { return SpreadsheetApp.openById(FINANCE_ID); }, sheet: '支出', cols: [1, 2, 3, 5], key: 2, text: [1] },
   'in': { file: function () { return SpreadsheetApp.openById(FINANCE_ID); }, sheet: '收入', cols: [1, 2, 3, 4], key: 2, text: [1] }
@@ -79,7 +83,7 @@ function write_(s, T, row, values) {
   if (T.sum) { var g = s.getRange(row, T.sum[0]); if (!g.getFormula()) g.setValue(Number(s.getRange(row, T.sum[1]).getValue() || 0) + Number(s.getRange(row, T.sum[2]).getValue() || 0)); }
   if (T.diff) { var f = s.getRange(row, T.diff[0]); if (!f.getFormula()) f.setValue(Number(s.getRange(row, T.diff[1]).getValue() || 0) - Number(s.getRange(row, T.diff[2]).getValue() || 0)); }
 }
-function update_(d) { var x = tbl_(d.t); check_(x.s, x.T, d.row, d.check); write_(x.s, x.T, d.row, d.values || {}); }
+function update_(d) { var x = tbl_(d.t); check_(x.s, x.T, d.row, d.check); write_(x.s, x.T, d.row, d.values || {}); afterInv_(x); }
 function del_(d) { var x = tbl_(d.t); check_(x.s, x.T, d.row, d.check); x.s.deleteRow(d.row); }
 function add_(d) {
   var x = tbl_(d.t), s = x.s, row;
@@ -95,6 +99,12 @@ function add_(d) {
     row = last + 1; if (row > s.getMaxRows()) s.insertRowAfter(last);
   }
   write_(s, x.T, row, d.values || {});
+  afterInv_(x);
+}
+function afterInv_(x) {
+  if (!x.T.minCol) return;
+  minHead_(x.s, x.T.minCol);
+  try { 庫存通知(); } catch (e) {} // 寄信失敗不影響存檔
 }
 
 // ===== 班表 =====
@@ -139,3 +149,48 @@ function auth_(token) {
 
 // 第一次部署前在編輯器執行一次這個函式，讓 Google 授權「連到外部網址」
 function 授權() { UrlFetchApp.fetch(ACTIVITY_API + '?action=loginConfig', { muteHttpExceptions: true }); }
+
+// ===== 最低量通知 =====
+// 倉儲清單 J 欄＝最低量（庫存 ≤ 最低量就要採購）；J 欄沒填時，沿用備註裡「剩 N 箱時採購」的 N。
+function minHead_(s, col) {
+  var v = s.getRange(1, 3, Math.min(s.getLastRow(), 15), 1).getDisplayValues();
+  for (var i = 0; i < v.length; i++) if (v[i][0] == '品項名稱') {
+    var h = s.getRange(i + 1, col);
+    if (!h.getDisplayValue()) { h.setValue('最低量'); s.getRange(i + 1, col - 1).copyTo(h, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false); }
+    return;
+  }
+}
+function lowItems_() {
+  var s = tbl_('inv').s, v = s.getDataRange().getDisplayValues(), out = [], cat = '';
+  v.forEach(function (r) {
+    if (/^\d+$/.test(r[1]) && r[2]) {
+      var stock = parseFloat(String(r[4]).replace(/[^\d.\-]/g, '')) || 0, min = String(r[9] || '').trim(), m;
+      if (min !== '' && !isNaN(parseFloat(min))) min = parseFloat(min);
+      else if (/採購/.test(r[8]) && (m = String(r[8]).match(/剩\s*(\d+)\s*\S?\s*時/))) min = +m[1];
+      else return;
+      if (stock <= min) out.push({ key: r[2], text: (cat ? '【' + cat + '】' : '') + r[2] + '：庫存 ' + stock + ' ' + r[3] + '（最低量 ' + min + '）' + (r[7] ? '・' + r[7] : '') });
+    } else if (r[0] && !r[1] && !/照片|品項總數|＊|新竹社創|管理清單/.test(r[0])) cat = String(r[0]).replace(/（.*?）/g, '').trim();
+  });
+  return out;
+}
+// 有品項「新」掉到最低量以下才寄信（同一品項補貨回來前不會重複寄）
+function 庫存通知() {
+  var low = lowItems_(), P = PropertiesService.getScriptProperties();
+  var before = JSON.parse(P.getProperty('lowSent') || '[]');
+  var fresh = low.filter(function (i) { return before.indexOf(i.key) < 0; });
+  P.setProperty('lowSent', JSON.stringify(low.map(function (i) { return i.key; })));
+  if (!fresh.length) return 0;
+  var to = NOTIFY_TO || Session.getEffectiveUser().getEmail();
+  var body = '以下品項已到最低量，要採購：\n\n' + fresh.map(function (i) { return '・' + i.text; }).join('\n') +
+    (low.length > fresh.length ? '\n\n其他還沒補貨的：\n' + low.filter(function (i) { return fresh.indexOf(i) < 0; }).map(function (i) { return '・' + i.text; }).join('\n') : '') +
+    '\n\n倉儲清單：https://hsh1120201-dev.github.io/inventory/';
+  MailApp.sendEmail(to, '【社創基地】' + fresh.length + ' 項物品到最低量要採購', body);
+  return fresh.length;
+}
+// 在編輯器執行一次：每天早上 9 點檢查（直接改試算表也會被抓到），並完成寄信授權
+function 開啟庫存通知() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() == '庫存通知') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('庫存通知').timeBased().everyDays(1).atHour(9).inTimezone('Asia/Taipei').create();
+  minHead_(tbl_('inv').s, TABLES.inv.minCol);
+  庫存通知();
+}
