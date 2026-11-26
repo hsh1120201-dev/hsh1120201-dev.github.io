@@ -72,8 +72,8 @@ footer a{color:var(--b)}
 <div id="list"></div>
 <footer>資料即時讀取自「新竹社創基地_倉儲清單」試算表，改試算表後重新整理即可更新｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
 </main>
-<script src="/backend/config.js?v=2"></script>
-<script src="/backend/admin.js?v=2"></script>
+<script src="/backend/config.js?v=3"></script>
+<script src="/backend/admin.js?v=3"></script>
 <script>
 var SHEET_ID="1XneXMCvOJgRJLyZlF7CpyxEmQQZVaeA7";
 var data={},tab="inv";
@@ -110,7 +110,7 @@ function renderInv(){
   var shown=items.filter(function(i){return(!c||i.cat==c)&&(!f||i.flags.length)&&(!q||(i.name+" "+i.where+" "+i.note+" "+i.cat).toLowerCase().indexOf(q)>=0)});
   if(!shown.length){$("list").innerHTML='<p class="empty">沒有符合的品項</p>';return}
   var groups=[],gm={};shown.forEach(function(i){if(!gm[i.cat]){gm[i.cat]=[];groups.push(i.cat)}gm[i.cat].push(i)});
-  var edit=Admin.on();
+  var edit=Admin.on()&&!!data.inv[0]&&!!data.inv[0].row;
   $("list").innerHTML=groups.map(function(g){return '<h2>'+esc(g||"未分類")+'（'+gm[g].length+'）'+(edit?' <button class="adm-edit" data-addcat="'+esc(g)+'">＋新增品項</button>':'')+'</h2><table><thead><tr><th>No.</th><th>品項</th><th class="num">庫存</th><th class="num">使用中</th><th class="num">總數</th><th>位置</th><th>備註</th></tr></thead><tbody>'+gm[g].map(function(i){
     return '<tr><td class="no">'+esc(i.no)+'</td><td class="name">'+esc(i.name)+(edit&&i.row?' <button class="adm-edit" data-inv="'+items.indexOf(i)+'">編輯</button>':'')+'<br>'+i.flags.map(function(x){return '<span class="tag '+x[0]+'">'+x[1]+'</span>'}).join("")+'</td><td class="num" data-k="庫存">'+i.stock+' '+esc(i.unit)+'</td><td class="num" data-k="使用中">'+i.use+'</td><td class="num" data-k="總數">'+i.total+'</td><td data-k="位置">'+esc(i.where||"—")+'</td><td class="note"'+(i.note?' data-k="備註"':'')+'>'+esc(i.note)+'</td></tr>'}).join("")+'</tbody></table>'}).join("");
 }
@@ -120,7 +120,7 @@ function renderKey(){
   $("stats").innerHTML=stat(keys.length,"種鑰匙")+stat(tot,"支（總數）")+stat(lent,"借出中",lent>0)+stat(tot-lent,"可借");
   var shown=keys.filter(function(k){return(!f||k.lent>0)&&(!q||(k.name+" "+k.who+" "+k.note).toLowerCase().indexOf(q)>=0)});
   if(!shown.length){$("list").innerHTML='<p class="empty">'+(f?"目前沒有借出的鑰匙":"沒有符合的鑰匙")+'</p>';return}
-  var edit=Admin.on();
+  var edit=Admin.on()&&!!data.inv[0]&&!!data.inv[0].row;
   $("list").innerHTML=(edit?'<p><button class="adm-edit" data-addkey="1">＋新增鑰匙</button></p>':'')+'<table><thead><tr><th>鑰匙</th><th class="num">數量</th><th class="num">借出中</th><th class="num">可借</th><th>領用人</th><th>備註</th></tr></thead><tbody>'+shown.map(function(k){
     return '<tr><td class="name">'+esc(k.name)+(edit&&k.row?' <button class="adm-edit" data-key="'+keys.indexOf(k)+'">編輯</button>':'')+(k.lent>0?' <span class="tag lent">借出 '+k.lent+'</span>':'')+(k.qty>0&&k.free<=0?' <span class="tag out">全部借出</span>':'')+'</td><td class="num" data-k="數量">'+k.qty+' '+esc(k.unit)+'</td><td class="num" data-k="借出中">'+k.lent+'</td><td class="num" data-k="可借">'+k.free+'</td><td'+(k.who?' data-k="領用人"':'')+'>'+esc(k.who)+'</td><td class="note"'+(k.note?' data-k="備註"':'')+'>'+esc(k.note)+'</td></tr>'}).join("")+'</tbody></table><p class="note" style="margin-top:.8em">借鑰匙時請在試算表「鑰匙清冊」的「租借中」填借出數量、「領用人」填姓名。</p>';
 }
@@ -135,11 +135,15 @@ function render(){
 function load(){
   var on=Admin.on();
   $("status").className="status";$("status").textContent="讀取中…";
-  Promise.all(on?[Admin.read("inv"),Admin.read("key")]:[get("倉儲清單"),get("鑰匙清冊")]).then(function(r){
+  var note="";
+  Promise.all(on?[Admin.read("inv"),Admin.read("key")]:[get("倉儲清單"),get("鑰匙清冊")]).catch(function(e){
+    if(!on)throw e;on=false;note="（後台還沒接上倉儲清單，目前只能看不能改）";return Promise.all([get("倉儲清單"),get("鑰匙清冊")]);
+  }).then(function(r){
     data.inv=parseInv(r[0]);data.key=parseKey(r[1]);
     var cats=[],c=$("cat").value;data.inv.forEach(function(i){if(cats.indexOf(i.cat)<0)cats.push(i.cat)});
     $("cat").innerHTML='<option value="">全部分類</option>'+cats.map(function(x){return '<option'+(x==c?' selected':'')+'>'+esc(x)+'</option>'}).join("");
-    $("status").textContent=(on?"編輯模式・":"")+"已讀取試算表・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+    $("status").textContent=(on?"編輯模式・":"")+"已讀取試算表・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})+note;
+    if(note)$("status").className="status err";
     render();
   }).catch(function(e){$("status").className="status err";$("status").textContent="讀不到試算表："+e.message+(on?"":"（請確認試算表共用設定為「知道連結的任何人可檢視」）")});
 }
