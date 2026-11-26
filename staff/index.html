@@ -50,14 +50,13 @@ footer{text-align:center;color:#888;font-size:.85em;margin-top:2.5em}
 <section><h2 style="--c:#6b7a8f">表單</h2><div class="grid"><a class="item" href="https://docs.google.com/forms/d/e/1FAIpQLScaXr4F0QR0A-KGe8OSkfuj42kgWBfYEam1XUkiTRqIBmj4uQ/viewform" target="_blank" rel="noopener"><b>進駐團隊意見箱</b><span>團隊意見回饋</span></a><a class="item" href="https://docs.google.com/forms/d/e/1FAIpQLScrMShGvC0ex5igQXjCpkhZ9pznWdEHXjDQ9VGPujIZ1LgDUw/viewform" target="_blank" rel="noopener"><b>系統使用意見調查</b><span>三個網站使用建議</span></a></div></section>
 <section><h2 style="--c:#6b7a8f">對外管道與工具</h2><div class="grid"><a class="item" href="https://hys.hsinchu.gov.tw/startupHub" target="_blank" rel="noopener"><b>社創基地官網（竹夢網）</b></a><a class="item" href="https://line.me/R/ti/p/@991xengs" target="_blank" rel="noopener"><b>LINE 官方帳號</b></a><a class="item" href="https://www.youtube.com/@hhsihub" target="_blank" rel="noopener"><b>YouTube 頻道</b></a><a class="item" href="https://search.google.com/search-console" target="_blank" rel="noopener"><b>Google Search Console</b><span>看 Google 搜尋收錄狀況</span></a></div></section>
 </template>
-<p id="who" class="who" hidden></p>
 <footer>基地電話 03-5593142 分機 3529｜本頁僅供內部使用，請勿對外分享</footer>
 </main>
 <script>
 var API="https://script.google.com/macros/s/AKfycbyRp9pfZlfnr-UiOJizY5ASMGFyHFLM8pzPBOV4QfUZyQOuaZQ6S-k7HS-63Kvji0Xrlw/exec";
 function $(id){return document.getElementById(id)}
 function api(a,d){return fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({action:a},d||{}))}).then(function(r){return r.json()}).catch(function(){throw new Error("連不上伺服器，請稍後再試")}).then(function(j){if(!j.ok)throw new Error(j.error||"登入失敗");return j})}
-function show(email){$("gate").hidden=true;var l=$("links");l.innerHTML="";l.appendChild($("tpl").content.cloneNode(true));l.hidden=false;var w=$("who");w.hidden=false;w.innerHTML=(email?email+"　":"")+'<a id="out">登出</a>';$("out").onclick=function(){try{sessionStorage.removeItem("must-admin");sessionStorage.removeItem("must-admin-email")}catch(e){}location.reload()}}
+function show(email){$("gate").hidden=true;var l=$("links");l.innerHTML="";l.appendChild($("tpl").content.cloneNode(true));l.hidden=false;}
 function onCred(r){$("gsi-msg").textContent="驗證中…";api("googleLogin",{credential:r.credential}).then(function(j){try{sessionStorage.setItem("must-admin",j.token);sessionStorage.setItem("must-admin-email",j.email||"")}catch(e){}show(j.email)}).catch(function(e){$("gsi-msg").textContent=e.message})}
 (function(){var t=null,em="";try{t=sessionStorage.getItem("must-admin");em=sessionStorage.getItem("must-admin-email")||""}catch(e){}
 if(t||!/[?&]login\b/.test(location.search))return show(em);
