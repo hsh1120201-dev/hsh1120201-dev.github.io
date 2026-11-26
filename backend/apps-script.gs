@@ -10,7 +10,7 @@
  *
  * 班表存在本試算表的「班表資料」分頁（第一次儲存時自動建立），原本的月份分頁不會被改動。
  */
-var INVENTORY_ID = '請填倉儲清單 Google 試算表 ID';
+var INVENTORY_ID = '1GaTYKBds0xFtv-ofYkMNryKFjWpA2sU1hYhiTAUxZ2I';
 var FINANCE_ID = '1uh2QXVU3uNwI5VTFAQvu71rm89IglIsWTef7B_6JkiI';
 // 活動報名系統的 Apps Script（Google 登入與後台帳號名單沿用這裡）
 var ACTIVITY_API = 'https://script.google.com/macros/s/AKfycbyRp9pfZlfnr-UiOJizY5ASMGFyHFLM8pzPBOV4QfUZyQOuaZQ6S-k7HS-63Kvji0Xrlw/exec';
