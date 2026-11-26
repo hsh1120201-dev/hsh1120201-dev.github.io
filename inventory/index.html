@@ -90,7 +90,7 @@ function parseInv(rows){
     if(/^\d+$/.test(r[1]||"")&&r[2]){
       var it={row:r._row,cat:cat,no:r[1],name:r[2],unit:r[3],stock:n(r[4]),use:n(r[5]),total:n(r[6]),where:r[7]||"",note:r[8]||"",min:(r[9]||"").trim(),flags:[]};
       var th=it.note.match(/剩\s*(\d+)\s*\S?\s*時/);it.lim=it.min!==""&&!isNaN(parseFloat(it.min))?parseFloat(it.min):(/採購/.test(it.note)&&th?+th[1]:null);
-      if(it.lim!=null&&it.stock<=it.lim)it.flags.push(["buy",it.stock<=0?"已用完・要採購":"到最低量・要採購"]);
+      if(it.lim>0&&it.stock<=it.lim)it.flags.push(["buy",it.stock<=0?"已用完・要採購":"到最低量・要採購"]);
       if(!it.where||/^\?|？|待確認/.test(it.where)||/找不到|不知道在哪/.test(it.note)||r[0]=="?")it.flags.push(["where","位置待確認"]);
       items.push(it);
     }else if(r[0]&&!r[1]&&!/照片|品項總數|＊|新竹社創|管理清單/.test(r[0])){cat=r[0].replace(/（.*?）/g,"").trim()}
