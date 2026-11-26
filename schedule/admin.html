@@ -107,16 +107,16 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
   <datalist id="lateNotes"><option>B時段</option><option>A時段</option><option>B時段(補)</option><option>A時段(補)</option><option>17:00到班</option></datalist>
 </div>
 </main>
-<script src="config.js"></script>
+<script src="/backend/config.js"></script>
 <script src="common.js"></script>
 <script>
 var MONTHS=monthList(),cur=0,days={},dirty=false,src="";
 var STATUS=["休館","不須值勤","無晚班","待定"];
 function $(id){return document.getElementById(id)}
-function pass(){try{return sessionStorage.getItem("sched-pass")||""}catch(e){return ""}}
+function pass(){try{return sessionStorage.getItem("base-pass")||""}catch(e){return ""}}
 function api(body){
-  if(!SCHEDULE_API)return Promise.reject(new Error("後台還沒連上：Apps Script 尚未部署（見 schedule/apps-script.gs 說明）"));
-  return fetch(SCHEDULE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})
+  if(!BASE_API)return Promise.reject(new Error("後台還沒連上：Apps Script 尚未部署（見 backend/apps-script.gs 說明）"));
+  return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})
     .then(function(r){return r.json()},function(){throw new Error("連不上後台，請稍後再試")})
     .then(function(j){if(!j.ok)throw new Error(j.error||"失敗");return j});
 }
@@ -126,7 +126,7 @@ $("login").onclick=function(){
   var p=$("pw").value.trim();if(!p){$("gmsg").textContent="請輸入密碼";return}
   $("gmsg").textContent="確認中…";
   api({action:"login",pass:p}).then(function(){
-    try{sessionStorage.setItem("sched-pass",p);localStorage.setItem("sched-me",$("me").value.trim())}catch(e){}
+    try{sessionStorage.setItem("base-pass",p);localStorage.setItem("sched-me",$("me").value.trim())}catch(e){}
     start();
   }).catch(function(e){$("gmsg").textContent=e.message});
 };
@@ -149,8 +149,8 @@ window.addEventListener("beforeunload",function(e){if(dirty){e.preventDefault();
 
 // ===== 讀取 =====
 function fromApi(M){
-  if(!SCHEDULE_API)return Promise.resolve(null);
-  return fetch(SCHEDULE_API+"?month="+ym(M)).then(function(r){return r.json()}).then(function(j){
+  if(!BASE_API)return Promise.resolve(null);
+  return fetch(BASE_API+"?month="+ym(M)).then(function(r){return r.json()}).then(function(j){
     if(!j.ok||!j.rows.length)return null;
     var m={days:{},notes:DEFAULT_NOTES.slice(),fromData:true,updated:""};
     j.rows.forEach(function(r){var d=+r.date.slice(8,10);m.days[d]={ev:r.event?[r.event]:[],early:[r.early,r.earlyNote],late:[r.late,r.lateNote]};if(r.updated>m.updated){m.updated=r.updated;m.by=r.by}});
@@ -233,7 +233,7 @@ $("save").onclick=function(){
     src="data";setDirty(false);_data=null;
     $("rows").querySelectorAll("tr.chg").forEach(function(r){r.classList.remove("chg")});
     var info=$("info");info.hidden=false;info.className="info ok";info.textContent="已儲存 "+M.yr+"年"+M.m+"月班表（"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})+"），前台重新整理就會看到。";
-  }).catch(function(e){alert("儲存失敗："+e.message);if(/密碼/.test(e.message)){try{sessionStorage.removeItem("sched-pass")}catch(_){}}})
+  }).catch(function(e){alert("儲存失敗："+e.message);if(/密碼/.test(e.message)){try{sessionStorage.removeItem("base-pass")}catch(_){}}})
   .then(function(){btn.disabled=false;btn.textContent="儲存這個月"});
 };
 </script>

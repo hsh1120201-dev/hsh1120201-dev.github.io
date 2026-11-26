@@ -119,7 +119,7 @@ function shiftHours(kind,lines,wd,R){
 function monthHours(model,M){
   var R=hourRule(model),first=(new Date(M.y,M.m-1,1).getDay()+6)%7,last=new Date(M.y,M.m,0).getDate(),cnt={};
   for(var d=1;d<=last;d++){var x=model.days[d];if(!x)continue;var wd=(first+d-1)%7;
-    [["early","e"],["late","l"]].forEach(function(k){var h=shiftHours(k[0],x[k[0]],wd,R);if(!h)return;var p=x[k[0]][0];
+    [["early","e"],["late","l"]].forEach(function(k){var h=shiftHours(k[0],x[k[0]],wd,R);var p=x[k[0]][0];if(!h||/^\d+$/.test(p))return;
       var c=cnt[p]||(cnt[p]={e:0,l:0,h:0});c[k[1]]++;c.h=Math.round((c.h+h)*100)/100})}
   return cnt;
 }
