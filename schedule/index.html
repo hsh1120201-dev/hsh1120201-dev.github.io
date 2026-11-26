@@ -17,7 +17,7 @@ h1{font-size:clamp(1.5em,4vw,2em);margin:.2em 0;letter-spacing:.06em}
 .sub{color:var(--mute);margin:0;font-size:.95em}
 .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;margin:1em 0}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
-.tabs button{border:2px solid var(--y);background:#fff;color:var(--ink);border-radius:999px;padding:.45em 1.1em;font:inherit;font-weight:700;cursor:pointer}
+.tabs button{border:2px solid var(--y);background:#fff;color:var(--ink);border-radius:999px;padding:.4em .8em;min-width:3.4em;font:inherit;font-weight:700;cursor:pointer}
 .tabs button.on{background:var(--y)}
 select{font:inherit;padding:.4em .6em;border-radius:10px;border:1px solid #ccc;background:#fff}
 .legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;font-size:.85em;color:var(--mute);margin-bottom:.8em}
@@ -70,6 +70,7 @@ footer a{color:var(--b)}
 <main>
 <header><h1>基地班表</h1><p class="sub">新竹社會創新基地・早班／晚班值勤</p></header>
 <div class="bar">
+  <select id="yr"><option value="115">115年</option><option value="116">116年</option></select>
   <div class="tabs" id="tabs"></div>
   <label>只看 <select id="who"><option value="">全部人員</option></select></label>
 </div>
@@ -89,10 +90,10 @@ footer a{color:var(--b)}
 <script>
 var SHEET_ID="1bNoY0xiXiCuwJMWQ_g6ngQIGWtEgLuJILyS3-9ETBW4";
 // 要顯示的月份：sheet＝試算表分頁名稱，check＝分頁標題要包含的字（避免抓錯分頁）
-var MONTHS=[
-  {label:"115年12月",y:2026,m:12,sheet:"12月",check:"115年12月"},
-  {label:"116年1月",y:2027,m:1,sheet:"116年1月",check:"116年1月",draft:draftJan}
-];
+var MONTHS=[];
+// 115年：分頁名稱「1月」～「12月」；116年起：分頁名稱「116年1月」～「116年12月」（在試算表新增分頁就會出現）
+for(var i=1;i<=12;i++)MONTHS.push({yr:115,label:i+"月",y:2026,m:i,sheet:i+"月",check:"115年"+i+"月"});
+for(var i=1;i<=12;i++)MONTHS.push({yr:116,label:i+"月",y:2027,m:i,sheet:"116年"+i+"月",check:"116年"+i+"月",draft:i==1?draftJan:null});
 var OFF=/^(休館|無晚班|不須值勤)$/;
 var WK="一二三四五六日";
 var cache={},cur=0;
@@ -147,7 +148,7 @@ function load(i){
     var m=parseGrid(parseCSV(t),M.check);
     if(m){m.live=true;return cache[i]=m}
     if(M.draft){m=M.draft();m.draft=true;return cache[i]=m}
-    throw new Error("試算表找不到「"+M.sheet+"」分頁");
+    var e=new Error("試算表還沒有「"+M.sheet+"」分頁，新增後重新整理就會顯示");e.nosheet=true;throw e;
   }).catch(function(e){if(M.draft){var m=M.draft();m.draft=true;m.err=e.message;return m}throw e});
 }
 
@@ -162,7 +163,7 @@ function names(model){var s={};Object.keys(model.days).forEach(function(d){var x
 
 function render(){
   var M=MONTHS[cur];
-  $("tabs").querySelectorAll("button").forEach(function(b,i){b.className=i==cur?"on":""});
+  $("tabs").querySelectorAll("button").forEach(function(b){b.className=+b.dataset.i==cur?"on":""});
   $("status").className="status";$("status").textContent="讀取中…";
   load(cur).then(function(model){
     var st=$("status");
@@ -188,14 +189,16 @@ function render(){
     var keys=Object.keys(cnt).filter(function(k){return list.indexOf(k)>=0});
     $("summary").hidden=!keys.length;
     $("summary").innerHTML='<h3>本月班數</h3><table><tr><th>人員</th><th>早班</th><th>晚班</th></tr>'+keys.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td></tr>'}).join("")+'</table>';
-  }).catch(function(e){$("status").className="status warn";$("status").textContent="讀不到班表："+e.message;$("cal").innerHTML=""});
+  }).catch(function(e){$("status").className="status warn";$("status").textContent=e.nosheet?e.message:"讀不到班表："+e.message;$("cal").innerHTML="";$("notes").innerHTML="";$("summary").hidden=true});
 }
-$("tabs").innerHTML=MONTHS.map(function(M,i){return '<button type="button" data-i="'+i+'">'+M.label+'</button>'}).join("");
-$("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;cur=+b.dataset.i;try{localStorage.setItem("sched-month",cur)}catch(_){}render()});
+function drawTabs(){var yr=MONTHS[cur].yr;$("yr").value=yr;$("tabs").innerHTML=MONTHS.map(function(M,i){return M.yr==yr?'<button type="button" data-i="'+i+'">'+M.label+'</button>':""}).join("")}
+$("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;cur=+b.dataset.i;try{localStorage.setItem("sched-month2",cur)}catch(_){}render()});
+$("yr").addEventListener("change",function(){var yr=+this.value,m=MONTHS[cur].m;MONTHS.forEach(function(M,i){if(M.yr==yr&&M.m==m)cur=i});drawTabs();render()});
 $("who").addEventListener("change",render);
 (function(){var n=new Date(),k=-1;MONTHS.forEach(function(M,i){if(M.y==n.getFullYear()&&M.m==n.getMonth()+1)k=i});
-  try{var s=localStorage.getItem("sched-month");if(s!==null&&MONTHS[+s])k=+s}catch(_){}
+  try{var s=localStorage.getItem("sched-month2");if(s!==null&&MONTHS[+s])k=+s}catch(_){}
   cur=k>=0?k:0})();
+drawTabs();
 render();
 </script>
 </body>

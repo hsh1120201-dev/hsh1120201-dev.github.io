@@ -86,7 +86,7 @@ function parseInv(rows){
   rows.forEach(function(r){
     if(/^\d+$/.test(r[1]||"")&&r[2]){
       var it={cat:cat,no:r[1],name:r[2],unit:r[3],stock:n(r[4]),use:n(r[5]),total:n(r[6]),where:r[7]||"",note:r[8]||"",flags:[]};
-      if(/採購/.test(it.note)){it.buyRule=true;if(it.stock<=1)it.flags.push(["buy",it.stock==0&&it.total==0?"已用完・要採購":"快用完・要採購"])}
+      var th=it.note.match(/剩\s*(\d+)\s*\S?\s*時/);if(/採購/.test(it.note)&&th&&it.stock<=+th[1])it.flags.push(["buy",it.total==0?"已用完・要採購":"到採購量・要採購"]);
       if(!it.where||/^\?|？|待確認/.test(it.where)||/找不到|不知道在哪/.test(it.note)||r[0]=="?")it.flags.push(["where","位置待確認"]);
       items.push(it);
     }else if(r[0]&&!r[1]&&!/照片|品項總數|＊|新竹社創|管理清單/.test(r[0])){cat=r[0].replace(/（.*?）/g,"").trim()}
