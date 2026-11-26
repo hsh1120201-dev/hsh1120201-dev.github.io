@@ -13,12 +13,39 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
 <link rel="apple-touch-icon" href="/favicon-192.png">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"新竹社會創新基地","alternateName":["新竹社創基地","Hsinchu Social Innovation Hub"],"url":"https://hsh1120201-dev.github.io/"}</script>
-<style>body{font-family:"Noto Sans TC",sans-serif;text-align:center;padding:4em 1em;color:#333;background:#fff}h1{font-size:1.8em}.btn{display:inline-block;margin:1.5em 0;padding:.8em 2em;border-radius:999px;background:#EC5415;color:#fff;text-decoration:none;font-weight:700}</style>
+<style>
+html,body{margin:0;height:100%}
+body{font-family:"Noto Sans TC",sans-serif;color:#333;background:#FBF7EF;position:relative;overflow-x:hidden;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center}
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+.bg svg{width:100%;height:100%}
+.card{position:relative;z-index:1;padding:2.5em 1.5em;max-width:640px}
+h1{font-size:clamp(1.8em,5vw,2.6em);margin:.2em 0;letter-spacing:.08em;color:#222}
+.sub{color:#555;margin:.4em 0 0}.sub span{white-space:nowrap}@media(max-width:480px){.sub .sep{display:none}.sub span{display:block}}
+.btn{display:inline-block;margin:1.8em 0 1.2em;padding:.9em 2.4em;border-radius:999px;background:#EC5415;color:#fff;text-decoration:none;font-weight:700;box-shadow:0 6px 18px rgba(236,84,21,.25)}
+.btn:hover{background:#d84a10}
+.links a{color:#0070BA;text-decoration:none}
+.links a:hover{text-decoration:underline}
+</style>
 </head>
 <body>
+<div class="bg" aria-hidden="true"><svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#EC5415"/><stop offset="1" stop-color="#F9B72F" stop-opacity="0"/></linearGradient>
+<linearGradient id="g2" x1="0" x2="1"><stop offset="0" stop-color="#0070BA" stop-opacity="0"/><stop offset=".6" stop-color="#0070BA"/></linearGradient>
+<radialGradient id="r1"><stop offset="0" stop-color="#F9B72F" stop-opacity=".35"/><stop offset="1" stop-color="#F9B72F" stop-opacity="0"/></radialGradient>
+<radialGradient id="r2"><stop offset="0" stop-color="#0070BA" stop-opacity=".18"/><stop offset="1" stop-color="#0070BA" stop-opacity="0"/></radialGradient>
+</defs>
+<circle cx="180" cy="160" r="420" fill="url(#r1)"/>
+<circle cx="1450" cy="880" r="480" fill="url(#r2)"/>
+<path d="M-50 820 Q 500 640 1100 760" stroke="url(#g1)" stroke-width="34" fill="none" stroke-linecap="round" opacity=".85"/>
+<path d="M300 900 Q 900 760 1700 860" stroke="url(#g2)" stroke-width="34" fill="none" stroke-linecap="round" opacity=".85"/>
+<path d="M1100 120 Q 1350 60 1700 140" stroke="#F9B72F" stroke-width="14" fill="none" stroke-linecap="round" opacity=".5"/>
+</svg></div>
+<main class="card">
 <h1>新竹社會創新基地</h1>
-<p>竹北同心樓3樓｜社會創新・永續 ESG・青年創業</p>
+<p class="sub"><span>竹北同心樓3樓</span><span class="sep">｜</span><span>社會創新・永續 ESG・青年創業</span></p>
 <a class="btn" href="/activity/">進入活動報名平台</a>
-<p><a href="https://hys.hsinchu.gov.tw/startupHub" target="_blank" rel="noopener">新竹社會創新基地官網</a>　｜　<a href="https://line.me/R/ti/p/@991xengs">LINE 官方帳號</a></p>
+<p class="links"><a href="https://hys.hsinchu.gov.tw/startupHub" target="_blank" rel="noopener">新竹社會創新基地官網</a>　｜　<a href="https://line.me/R/ti/p/@991xengs">LINE 官方帳號</a></p>
+</main>
 </body>
 </html>
