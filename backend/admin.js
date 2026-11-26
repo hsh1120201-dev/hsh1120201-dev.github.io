@@ -12,7 +12,7 @@ var Admin=(function(){
   '.adm-edit{font:inherit;font-size:.8em;border:1px solid #ccd;border-radius:8px;background:#fff;color:#0070BA;padding:2px 8px;cursor:pointer;margin-left:4px}';
   var st=document.createElement("style");st.textContent=css;document.head.appendChild(st);
   var ACT="https://script.google.com/macros/s/AKfycbyRp9pfZlfnr-UiOJizY5ASMGFyHFLM8pzPBOV4QfUZyQOuaZQ6S-k7HS-63Kvji0Xrlw/exec";
-  // 跟內部人員入口、報名後台共用同一個 Google 登入憑證
+  // 跟工作人員入口、報名後台共用同一個 Google 登入憑證
   function pass(){try{var t=sessionStorage.getItem("must-admin")||"";var p=t.split(".");if(p.length==3&&+p[0]>Date.now()&&p[1])return t}catch(e){}return ""}
   function email(){try{return sessionStorage.getItem("must-admin-email")||""}catch(e){return ""}}
   function logout(){try{sessionStorage.removeItem("must-admin");sessionStorage.removeItem("must-admin-email")}catch(e){}}
