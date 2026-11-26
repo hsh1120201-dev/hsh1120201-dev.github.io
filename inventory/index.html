@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>倉儲清單｜新竹社會創新基地</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<style>
+:root{--y:#F9B72F;--r:#EC5415;--b:#0070BA;--bg:#FBF7EF;--ink:#2b2b2b;--mute:#777}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg);min-height:100vh}
+main{max-width:1100px;margin:0 auto;padding:2em 16px 3em}
+header{text-align:center;margin-bottom:1.2em}
+h1{font-size:clamp(1.5em,4vw,2em);margin:.2em 0;letter-spacing:.06em}
+.sub{color:var(--mute);margin:0;font-size:.95em}
+.tabs{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:1em 0}
+.tabs button{border:2px solid var(--y);background:#fff;color:var(--ink);border-radius:999px;padding:.45em 1.1em;font:inherit;font-weight:700;cursor:pointer}
+.tabs button.on{background:var(--y)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:1em}
+.stat{background:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.stat b{display:block;font-size:1.6em}
+.stat span{color:var(--mute);font-size:.85em}
+.stat.warn b{color:var(--r)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:1em}
+.tools input[type=search]{flex:1 1 220px;font:inherit;padding:.5em .8em;border-radius:10px;border:1px solid #ccc}
+select{font:inherit;padding:.45em .6em;border-radius:10px;border:1px solid #ccc;background:#fff}
+label.chk{font-size:.92em;white-space:nowrap}
+.status{text-align:center;color:var(--mute);font-size:.9em;min-height:1.3em}
+.status.err{color:#b34700}
+h2{font-size:1.05em;margin:1.4em 0 .5em;padding-left:.6em;border-left:5px solid var(--b)}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #f0ebe0;font-size:.93em;vertical-align:top}
+th{background:#fff5df;font-weight:700;white-space:nowrap}
+td.num,th.num{text-align:right;white-space:nowrap}
+td.no{color:#999;width:3em}
+.tag{display:inline-block;font-size:.75em;font-weight:700;border-radius:6px;padding:1px 6px;margin:1px 4px 1px 0;white-space:nowrap}
+.tag.buy{background:#fde8dd;color:#a33a0c}
+.tag.where{background:#e8f1fa;color:#1d5a8c}
+.tag.out{background:#f8d7da;color:#8a1c24}
+.tag.lent{background:#fff1c9;color:#7a5600}
+.note{color:#666;font-size:.88em}
+.empty{text-align:center;color:var(--mute);padding:2em 0}
+footer{text-align:center;color:#888;font-size:.85em;margin-top:2em}
+footer a{color:var(--b)}
+@media (max-width:700px){
+  table,thead,tbody,tr,td{display:block;width:100%}
+  thead{display:none}
+  table{background:transparent;box-shadow:none}
+  tr{background:#fff;border-radius:12px;margin-bottom:8px;padding:8px 12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  td{border:0;padding:2px 0}
+  td[data-k]::before{content:attr(data-k)"：";color:var(--mute);font-size:.85em}
+  td.name{font-weight:700;font-size:1.05em}
+  td.num{text-align:left;display:inline-block;width:auto;margin-right:14px}
+  td.no{display:none}
+}
+</style>
+</head>
+<body>
+<main>
+<header><h1>倉儲清單</h1><p class="sub">新竹社會創新基地・物品與鑰匙</p></header>
+<div class="tabs" id="tabs"><button type="button" data-t="inv" class="on">物品清單</button><button type="button" data-t="key">鑰匙清冊</button></div>
+<p class="status" id="status">讀取中…</p>
+<div class="stats" id="stats"></div>
+<div class="tools" id="tools">
+  <input type="search" id="q" placeholder="搜尋品項、位置、備註…">
+  <select id="cat"><option value="">全部分類</option></select>
+  <label class="chk"><input type="checkbox" id="flag"> 只看要處理的</label>
+</div>
+<div id="list"></div>
+<footer>資料即時讀取自「新竹社創基地_倉儲清單」試算表，改試算表後重新整理即可更新｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
+</main>
+<script>
+var SHEET_ID="1XneXMCvOJgRJLyZlF7CpyxEmQQZVaeA7";
+var data={},tab="inv";
+function $(id){return document.getElementById(id)}
+$("src").href="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/edit";
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function parseCSV(t){var rows=[],row=[],f="",q=false;for(var i=0;i<t.length;i++){var c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==','){row.push(f);f=""}else if(c=='\n'){row.push(f);rows.push(row);row=[];f=""}else if(c!='\r')f+=c}if(f||row.length){row.push(f);rows.push(row)}return rows}
+function get(sheet){return fetch("https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&headers=0&sheet="+encodeURIComponent(sheet)).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text()}).then(function(t){return parseCSV(t).map(function(r){return r.map(function(x){return x.trim()})})})}
+function n(x){var v=parseFloat(String(x).replace(/[^\d.\-]/g,""));return isNaN(v)?0:v}
+
+function parseInv(rows){
+  var items=[],cat="";
+  rows.forEach(function(r){
+    if(/^\d+$/.test(r[1]||"")&&r[2]){
+      var it={cat:cat,no:r[1],name:r[2],unit:r[3],stock:n(r[4]),use:n(r[5]),total:n(r[6]),where:r[7]||"",note:r[8]||"",flags:[]};
+      var th=it.note.match(/剩\s*(\d+)\s*\S?\s*時/);if(/採購/.test(it.note)&&th&&it.stock<=+th[1])it.flags.push(["buy",it.total==0?"已用完・要採購":"到採購量・要採購"]);
+      if(!it.where||/^\?|？|待確認/.test(it.where)||/找不到|不知道在哪/.test(it.note)||r[0]=="?")it.flags.push(["where","位置待確認"]);
+      items.push(it);
+    }else if(r[0]&&!r[1]&&!/照片|品項總數|＊|新竹社創|管理清單/.test(r[0])){cat=r[0].replace(/（.*?）/g,"").trim()}
+  });
+  return items;
+}
+function parseKey(rows){
+  var keys=[];
+  rows.forEach(function(r){if(/鑰匙/.test(r[1]||"")&&r[1]!="鑰匙名稱")keys.push({name:r[1],unit:r[2],qty:n(r[3]),lent:n(r[4]),free:n(r[5]),who:r[6]||"",note:r[7]||""})});
+  return keys;
+}
+
+function renderInv(){
+  var items=data.inv,q=$("q").value.trim().toLowerCase(),c=$("cat").value,f=$("flag").checked;
+  var buy=items.filter(function(i){return i.flags.some(function(x){return x[0]=="buy"})}).length;
+  var where=items.filter(function(i){return i.flags.some(function(x){return x[0]=="where"})}).length;
+  $("stats").innerHTML=stat(items.length,"品項")+stat(items.reduce(function(s,i){return s+i.total},0),"物品總數")+stat(buy,"要採購",buy>0)+stat(where,"位置待確認",where>0);
+  var shown=items.filter(function(i){return(!c||i.cat==c)&&(!f||i.flags.length)&&(!q||(i.name+" "+i.where+" "+i.note+" "+i.cat).toLowerCase().indexOf(q)>=0)});
+  if(!shown.length){$("list").innerHTML='<p class="empty">沒有符合的品項</p>';return}
+  var groups=[],gm={};shown.forEach(function(i){if(!gm[i.cat]){gm[i.cat]=[];groups.push(i.cat)}gm[i.cat].push(i)});
+  $("list").innerHTML=groups.map(function(g){return '<h2>'+esc(g||"未分類")+'（'+gm[g].length+'）</h2><table><thead><tr><th>No.</th><th>品項</th><th class="num">庫存</th><th class="num">使用中</th><th class="num">總數</th><th>位置</th><th>備註</th></tr></thead><tbody>'+gm[g].map(function(i){
+    return '<tr><td class="no">'+esc(i.no)+'</td><td class="name">'+esc(i.name)+'<br>'+i.flags.map(function(x){return '<span class="tag '+x[0]+'">'+x[1]+'</span>'}).join("")+'</td><td class="num" data-k="庫存">'+i.stock+' '+esc(i.unit)+'</td><td class="num" data-k="使用中">'+i.use+'</td><td class="num" data-k="總數">'+i.total+'</td><td data-k="位置">'+esc(i.where||"—")+'</td><td class="note"'+(i.note?' data-k="備註"':'')+'>'+esc(i.note)+'</td></tr>'}).join("")+'</tbody></table>'}).join("");
+}
+function renderKey(){
+  var keys=data.key,q=$("q").value.trim().toLowerCase(),f=$("flag").checked;
+  var tot=keys.reduce(function(s,k){return s+k.qty},0),lent=keys.reduce(function(s,k){return s+k.lent},0);
+  $("stats").innerHTML=stat(keys.length,"種鑰匙")+stat(tot,"支（總數）")+stat(lent,"借出中",lent>0)+stat(tot-lent,"可借");
+  var shown=keys.filter(function(k){return(!f||k.lent>0)&&(!q||(k.name+" "+k.who+" "+k.note).toLowerCase().indexOf(q)>=0)});
+  if(!shown.length){$("list").innerHTML='<p class="empty">'+(f?"目前沒有借出的鑰匙":"沒有符合的鑰匙")+'</p>';return}
+  $("list").innerHTML='<table><thead><tr><th>鑰匙</th><th class="num">數量</th><th class="num">借出中</th><th class="num">可借</th><th>領用人</th><th>備註</th></tr></thead><tbody>'+shown.map(function(k){
+    return '<tr><td class="name">'+esc(k.name)+(k.lent>0?' <span class="tag lent">借出 '+k.lent+'</span>':'')+(k.qty>0&&k.free<=0?' <span class="tag out">全部借出</span>':'')+'</td><td class="num" data-k="數量">'+k.qty+' '+esc(k.unit)+'</td><td class="num" data-k="借出中">'+k.lent+'</td><td class="num" data-k="可借">'+k.free+'</td><td'+(k.who?' data-k="領用人"':'')+'>'+esc(k.who)+'</td><td class="note"'+(k.note?' data-k="備註"':'')+'>'+esc(k.note)+'</td></tr>'}).join("")+'</tbody></table><p class="note" style="margin-top:.8em">借鑰匙時請在試算表「鑰匙清冊」的「租借中」填借出數量、「領用人」填姓名。</p>';
+}
+function stat(v,l,w){return '<div class="stat'+(w?' warn':'')+'"><b>'+v+'</b><span>'+l+'</span></div>'}
+function render(){
+  document.querySelectorAll("#tabs button").forEach(function(b){b.className=b.dataset.t==tab?"on":""});
+  $("cat").hidden=tab!="inv";
+  $("flag").parentNode.lastChild.textContent=tab=="inv"?" 只看要處理的":" 只看借出中";
+  if(!data[tab])return;
+  tab=="inv"?renderInv():renderKey();
+}
+Promise.all([get("倉儲清單"),get("鑰匙清冊")]).then(function(r){
+  data.inv=parseInv(r[0]);data.key=parseKey(r[1]);
+  var cats=[];data.inv.forEach(function(i){if(cats.indexOf(i.cat)<0)cats.push(i.cat)});
+  $("cat").innerHTML='<option value="">全部分類</option>'+cats.map(function(c){return '<option>'+esc(c)+'</option>'}).join("");
+  $("status").textContent="已讀取試算表・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+  render();
+}).catch(function(e){$("status").className="status err";$("status").textContent="讀不到試算表："+e.message+"（請確認試算表共用設定為「知道連結的任何人可檢視」）"});
+$("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;tab=b.dataset.t;$("flag").checked=false;render()});
+["q","cat","flag"].forEach(function(id){$(id).addEventListener(id=="q"?"input":"change",render)});
+</script>
+</body>
+</html>

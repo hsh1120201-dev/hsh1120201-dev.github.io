@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>零用金收支｜新竹社會創新基地</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<style>
+:root{--y:#F9B72F;--r:#EC5415;--b:#0070BA;--g:#2e8b57;--bg:#FBF7EF;--ink:#2b2b2b;--mute:#777}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg);min-height:100vh}
+main{max-width:1000px;margin:0 auto;padding:2em 16px 3em}
+header{text-align:center;margin-bottom:1.2em}
+h1{font-size:clamp(1.5em,4vw,2em);margin:.2em 0;letter-spacing:.06em}
+.sub{color:var(--mute);margin:0;font-size:.95em}
+.tabs{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:1em 0}
+.tabs button{border:2px solid var(--y);background:#fff;color:var(--ink);border-radius:999px;padding:.45em 1.1em;font:inherit;font-weight:700;cursor:pointer}
+.tabs button.on{background:var(--y)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:1em}
+.stat{background:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.stat b{display:block;font-size:1.5em}
+.stat span{color:var(--mute);font-size:.85em}
+.stat.out b{color:var(--r)}.stat.in b{color:var(--g)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1em}
+.tools input{flex:1 1 220px;font:inherit;padding:.5em .8em;border-radius:10px;border:1px solid #ccc}
+select{font:inherit;padding:.45em .6em;border-radius:10px;border:1px solid #ccc;background:#fff}
+.status{text-align:center;color:var(--mute);font-size:.9em;min-height:1.3em}
+.status.err{color:#b34700}
+h2{font-size:1.05em;margin:1.4em 0 .5em;padding-left:.6em;border-left:5px solid var(--b)}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #f0ebe0;font-size:.93em;vertical-align:top}
+th{background:#fff5df;font-weight:700;white-space:nowrap}
+td.num,th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.date{white-space:nowrap;color:#555}
+td.item{white-space:pre-line}
+td.note{color:#666;font-size:.88em}
+.tag{display:inline-block;font-size:.75em;font-weight:700;border-radius:6px;padding:1px 6px;background:#fff1c9;color:#7a5600;margin-left:4px}
+.small{color:var(--mute);font-size:.82em;margin:.5em 0 0}
+.empty{text-align:center;color:var(--mute);padding:2em 0}
+footer{text-align:center;color:#888;font-size:.85em;margin-top:2em}
+footer a{color:var(--b)}
+@media (max-width:700px){
+  #list table,#list thead,#list tbody,#list tr,#list td{display:block;width:100%}
+  #list thead{display:none}
+  #list table{background:transparent;box-shadow:none}
+  #list tr{background:#fff;border-radius:12px;margin-bottom:8px;padding:8px 12px;box-shadow:0 1px 4px rgba(0,0,0,.06);position:relative}
+  #list td{border:0;padding:2px 0}
+  #list td.num{position:absolute;right:12px;top:8px;width:auto;font-weight:700;font-size:1.05em}
+  #list td.date{font-size:.85em;padding-right:6em}
+}
+</style>
+</head>
+<body>
+<main>
+<header><h1>零用金收支</h1><p class="sub">新竹社會創新基地・支出與收入紀錄</p></header>
+<div class="tabs" id="tabs"><button type="button" data-t="out" class="on">支出</button><button type="button" data-t="in">收入</button></div>
+<p class="status" id="status">讀取中…</p>
+<div class="stats" id="stats"></div>
+<div class="tools"><input type="search" id="q" placeholder="搜尋品項、備註、代墊人…"><select id="mon"><option value="">全部月份</option></select></div>
+<div id="list"></div>
+<div id="extra"></div>
+<footer>資料即時讀取自「社創基地｜財務」試算表，改試算表後重新整理即可更新｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
+</main>
+<script>
+var SHEET_ID="1uh2QXVU3uNwI5VTFAQvu71rm89IglIsWTef7B_6JkiI";
+var data={},tab="out";
+function $(id){return document.getElementById(id)}
+$("src").href="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/edit";
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function parseCSV(t){var rows=[],row=[],f="",q=false;for(var i=0;i<t.length;i++){var c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}else if(c=='"')q=true;else if(c==','){row.push(f);f=""}else if(c=='\n'){row.push(f);rows.push(row);row=[];f=""}else if(c!='\r')f+=c}if(f||row.length){row.push(f);rows.push(row)}return rows}
+function get(sheet){return fetch("https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:csv&headers=0&sheet="+encodeURIComponent(sheet)).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text()}).then(function(t){return parseCSV(t).map(function(r){return r.map(function(x){return x.trim()})})})}
+function money(x){var m=String(x).replace(/[,，]/g,"").match(/-?\d+(\.\d+)?/);return m?+m[0]:0}
+function fmt(v){return "$"+v.toLocaleString("zh-TW")}
+// 日期統一成民國年：0115/01/28、115/1/28、2026/06/22 都可以
+function date(s){var m=String(s).match(/(\d{2,4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);if(!m)return null;var y=+m[1];if(y>1911)y-=1911;return{y:y,m:+m[2],d:+m[3],key:y*10000+(+m[2])*100+(+m[3]),txt:y+"/"+("0"+m[2]).slice(-2)+"/"+("0"+m[3]).slice(-2)}}
+function parse(rows,isOut){
+  var list=[];
+  rows.forEach(function(r){var d=date(r[0]);if(!d||!r[1])return;
+    var e={d:d,item:r[1],amt:money(r[2]),raw:r[2],note:(isOut?r[4]:r[3])||""};
+    if(/^(加總|小計|合計)$/.test(e.item))e.sub=true;
+    if(isOut){var p=e.note.match(/[$＄]\s*(\d+)\s*由\s*([^\s，,。]+?)代墊/),q=e.note.match(/([A-Za-z]+|[一-鿿]{1,3})代墊/);
+      if(p)e.adv={who:p[2],amt:+p[1]};else if(q)e.adv={who:q[1],amt:e.amt}}
+    list.push(e)});
+  return list.sort(function(a,b){return b.d.key-a.d.key});
+}
+function norm(w){return w.toUpperCase()=="KONO"?"KONO":w.replace(/姊|姐|哥$/,"")}
+function render(){
+  document.querySelectorAll("#tabs button").forEach(function(b){b.className=b.dataset.t==tab?"on":""});
+  if(!data.out)return;
+  var all=data[tab],isOut=tab=="out",q=$("q").value.trim().toLowerCase(),mon=$("mon").value;
+  var months=[];all.forEach(function(e){var k=e.d.y+"/"+("0"+e.d.m).slice(-2);if(months.indexOf(k)<0)months.push(k)});
+  $("mon").innerHTML='<option value="">全部月份</option>'+months.map(function(k){return '<option'+(k==mon?' selected':'')+'>'+k+'</option>'}).join("");
+  var list=all.filter(function(e){var k=e.d.y+"/"+("0"+e.d.m).slice(-2);return(!mon||k==mon)&&(!q||(e.item+" "+e.note).toLowerCase().indexOf(q)>=0)});
+  function tot(a){return a.reduce(function(s,e){return s+(e.sub?0:e.amt)},0)}
+  var sum=tot(list);
+  var tin=tot(data["in"]),tout=tot(data.out);
+  $("stats").innerHTML='<div class="stat '+tab+'"><b>'+fmt(sum)+'</b><span>'+(mon||"全部")+(isOut?"支出":"收入")+'（'+list.filter(function(e){return!e.sub}).length+' 筆）</span></div><div class="stat out"><b>'+fmt(tout)+'</b><span>支出總計</span></div><div class="stat in"><b>'+fmt(tin)+'</b><span>收入總計</span></div>';
+  if(!list.length){$("list").innerHTML='<p class="empty">沒有符合的紀錄</p>';$("extra").innerHTML="";return}
+  $("list").innerHTML='<table><thead><tr><th>日期</th><th>品項</th><th class="num">金額</th><th>備註</th></tr></thead><tbody>'+list.map(function(e){
+    return '<tr'+(e.sub?' style="background:#f6f3ec"':'')+'><td class="date">'+e.d.txt+'</td><td class="item">'+esc(e.item)+'</td><td class="num">'+(e.sub?'<span class="tag">點交小計・不計入</span> ':'')+fmt(e.amt)+(/含稅/.test(e.raw)?'<span class="tag">含稅</span>':'')+'</td><td class="note">'+esc(e.note)+'</td></tr>'}).join("")+'</tbody></table>';
+  if(isOut){var adv={};list.forEach(function(e){if(e.adv){var w=norm(e.adv.who);adv[w]=adv[w]||{n:0,a:0};adv[w].n++;adv[w].a+=e.adv.amt}});var ks=Object.keys(adv).sort(function(a,b){return adv[b].a-adv[a].a});
+    $("extra").innerHTML=ks.length?'<h2>代墊彙整</h2><table><thead><tr><th>代墊人</th><th class="num">筆數</th><th class="num">金額</th></tr></thead><tbody>'+ks.map(function(k){return '<tr><td>'+esc(k)+'</td><td class="num">'+adv[k].n+'</td><td class="num">'+fmt(adv[k].a)+'</td></tr>'}).join("")+'</tbody></table><p class="small">依備註裡「○○代墊」自動整理，僅供參考；是否已歸還請以實際紀錄為準。</p>':"";
+  }else $("extra").innerHTML="";
+}
+Promise.all([get("支出"),get("收入")]).then(function(r){
+  data.out=parse(r[0],true);data["in"]=parse(r[1],false);
+  $("status").textContent="已讀取試算表・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+  render();
+}).catch(function(e){$("status").className="status err";$("status").textContent="讀不到試算表："+e.message+"（請確認試算表共用設定為「知道連結的任何人可檢視」）"});
+$("tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;tab=b.dataset.t;$("mon").value="";render()});
+$("q").addEventListener("input",render);$("mon").addEventListener("change",render);
+</script>
+</body>
+</html>

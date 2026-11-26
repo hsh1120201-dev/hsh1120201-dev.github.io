@@ -1,0 +1,119 @@
+/**
+ * 新竹社創基地 後台（班表、倉儲清單、鑰匙清冊、零用金收支 共用）
+ *
+ * 安裝：
+ * 1. 打開「2026社創基地班表」試算表 > 擴充功能 > Apps Script，貼上本檔全部內容、儲存
+ * 2. 確認下面 INVENTORY_ID、FINANCE_ID 是正確的試算表 ID（倉儲清單要是 Google 試算表格式，不能是 .xlsx）
+ * 3. 左側齒輪「專案設定」> 指令碼屬性 > 新增屬性 ADMIN_PASS，值＝後台密碼
+ * 4. 部署 > 新增部署作業 > 類型「網頁應用程式」，執行身分「我」，存取權「所有人」> 部署，第一次會要求授權
+ * 5. 把網頁應用程式網址貼到 GitHub 的 backend/config.js（BASE_API）
+ *
+ * 班表存在本試算表的「班表資料」分頁（第一次儲存時自動建立），原本的月份分頁不會被改動。
+ */
+var INVENTORY_ID = '請填倉儲清單 Google 試算表 ID';
+var FINANCE_ID = '1uh2QXVU3uNwI5VTFAQvu71rm89IglIsWTef7B_6JkiI';
+
+// 各表格：檔案、分頁、可以改的欄（從 1 開始）、用來確認是哪一列的欄
+var TABLES = {
+  inv: { file: function () { return SpreadsheetApp.openById(INVENTORY_ID); }, sheet: '倉儲清單', cols: [2, 3, 4, 5, 6, 8, 9], key: 3, sum: [7, 5, 6] },
+  key: { file: function () { return SpreadsheetApp.openById(INVENTORY_ID); }, sheet: '鑰匙清冊', cols: [2, 3, 4, 5, 7, 8], key: 2, diff: [6, 4, 5] },
+  out: { file: function () { return SpreadsheetApp.openById(FINANCE_ID); }, sheet: '支出', cols: [1, 2, 3, 5], key: 2, text: [1] },
+  'in': { file: function () { return SpreadsheetApp.openById(FINANCE_ID); }, sheet: '收入', cols: [1, 2, 3, 4], key: 2, text: [1] }
+};
+
+var DATA_SHEET = '班表資料';
+var HEAD = ['日期', '早班', '早班備註', '晚班', '晚班備註', '活動', '更新時間', '更新人'];
+
+function out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+function clean_(v) { v = String(v == null ? '' : v).trim().slice(0, 300); return /^[=+\-@]/.test(v) && !/^-?\d+(\.\d+)?$/.test(v) ? "'" + v : v; }
+function tbl_(t) { var T = TABLES[t]; if (!T) throw new Error('未知的表格'); var s = T.file().getSheetByName(T.sheet); if (!s) throw new Error('找不到分頁 ' + T.sheet); return { T: T, s: s }; }
+
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  try {
+    if (p.t) { var x = tbl_(p.t); return out_({ ok: true, rows: x.s.getDataRange().getDisplayValues() }); }
+    var v = schedSheet_().getDataRange().getDisplayValues().slice(1);
+    var month = p.month || '';
+    return out_({ ok: true, rows: v.filter(function (r) { return r[0] && (!month || r[0].indexOf(month) == 0); })
+      .map(function (r) { return { date: r[0], early: r[1], earlyNote: r[2], late: r[3], lateNote: r[4], event: r[5], updated: r[6], by: r[7] }; }) });
+  } catch (err) { return out_({ ok: false, error: err.message }); }
+}
+
+function doPost(e) {
+  try {
+    var d = JSON.parse(e.postData.contents);
+    var pass = PropertiesService.getScriptProperties().getProperty('ADMIN_PASS');
+    if (!pass) throw new Error('還沒設定後台密碼（指令碼屬性 ADMIN_PASS）');
+    if (d.pass !== pass) throw new Error('密碼錯誤');
+    if (d.action == 'login') return out_({ ok: true });
+    var lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      if (d.action == 'saveMonth') saveMonth_(d.month, d.days || [], clean_(d.by));
+      else if (d.action == 'update') update_(d);
+      else if (d.action == 'add') add_(d);
+      else if (d.action == 'delete') del_(d);
+      else throw new Error('未知的動作');
+    } finally { lock.releaseLock(); }
+    return out_({ ok: true });
+  } catch (err) { return out_({ ok: false, error: err.message }); }
+}
+
+// ===== 表格（倉儲、鑰匙、支出、收入） =====
+function check_(s, T, row, expect) {
+  if (!(row >= 1 && row <= s.getLastRow())) throw new Error('列號錯誤');
+  var now = String(s.getRange(row, T.key).getDisplayValue()).trim();
+  if (now !== String(expect || '').trim()) throw new Error('資料已被別人改過，請重新整理後再試');
+}
+function write_(s, T, row, values) {
+  T.cols.forEach(function (c) {
+    if (!(String(c) in values)) return;
+    var r = s.getRange(row, c);
+    if (T.text && T.text.indexOf(c) >= 0) r.setNumberFormat('@');
+    var v = clean_(values[c]);
+    if (/^-?\d+(\.\d+)?$/.test(v) && !(T.text && T.text.indexOf(c) >= 0)) v = Number(v);
+    r.setValue(v);
+  });
+  // 總數＝庫存＋使用中；未租借＝數量－租借中（原本是公式就不動）
+  if (T.sum) { var g = s.getRange(row, T.sum[0]); if (!g.getFormula()) g.setValue(Number(s.getRange(row, T.sum[1]).getValue() || 0) + Number(s.getRange(row, T.sum[2]).getValue() || 0)); }
+  if (T.diff) { var f = s.getRange(row, T.diff[0]); if (!f.getFormula()) f.setValue(Number(s.getRange(row, T.diff[1]).getValue() || 0) - Number(s.getRange(row, T.diff[2]).getValue() || 0)); }
+}
+function update_(d) { var x = tbl_(d.t); check_(x.s, x.T, d.row, d.check); write_(x.s, x.T, d.row, d.values || {}); }
+function del_(d) { var x = tbl_(d.t); check_(x.s, x.T, d.row, d.check); x.s.deleteRow(d.row); }
+function add_(d) {
+  var x = tbl_(d.t), s = x.s, row;
+  if (d.after) { // 插在指定列下面（倉儲：同分類最後一項；鑰匙：最後一支）
+    if (!(d.after >= 1 && d.after < s.getLastRow())) throw new Error('位置錯誤');
+    s.insertRowAfter(d.after); row = d.after + 1;
+    s.getRange(d.after, 1, 1, s.getLastColumn()).copyTo(s.getRange(row, 1, 1, s.getLastColumn()), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+    // 公式欄照上一列複製
+    [x.T.sum, x.T.diff].forEach(function (a) { if (!a) return; var src = s.getRange(d.after, a[0]); if (src.getFormula()) src.copyTo(s.getRange(row, a[0])); });
+  } else { // 收支：加在最後
+    var v = s.getRange(1, 1, s.getLastRow(), 1).getDisplayValues(), last = 1;
+    for (var i = v.length - 1; i >= 0; i--) if (String(v[i][0]).trim()) { last = i + 1; break; }
+    row = last + 1; if (row > s.getMaxRows()) s.insertRowAfter(last);
+  }
+  write_(s, x.T, row, d.values || {});
+}
+
+// ===== 班表 =====
+function schedSheet_() {
+  var ss = SpreadsheetApp.getActive(), s = ss.getSheetByName(DATA_SHEET);
+  if (!s) {
+    s = ss.insertSheet(DATA_SHEET);
+    s.getRange(1, 1, 1, HEAD.length).setValues([HEAD]).setFontWeight('bold');
+    s.getRange('A:A').setNumberFormat('@'); s.setFrozenRows(1);
+  }
+  return s;
+}
+function saveMonth_(month, days, by) {
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('月份格式錯誤');
+  var s = schedSheet_(), all = s.getDataRange().getDisplayValues().slice(1);
+  var keep = all.filter(function (r) { return r[0] && r[0].indexOf(month) != 0; });
+  var now = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy/MM/dd HH:mm');
+  var add = days.filter(function (x) { return /^\d{4}-\d{2}-\d{2}$/.test(x.date) && x.date.indexOf(month) == 0; })
+    .map(function (x) { return [x.date, clean_(x.early), clean_(x.earlyNote), clean_(x.late), clean_(x.lateNote), clean_(x.event), now, by]; });
+  var rows = keep.concat(add).sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });
+  if (s.getLastRow() > 1) s.getRange(2, 1, s.getLastRow() - 1, HEAD.length).clearContent();
+  if (rows.length) { s.getRange(2, 1, rows.length, 1).setNumberFormat('@'); s.getRange(2, 1, rows.length, HEAD.length).setValues(rows); }
+}
