@@ -60,7 +60,7 @@ function api(a,d){return fetch(API,{method:"POST",headers:{"Content-Type":"text/
 function show(email){$("gate").hidden=true;var l=$("links");l.innerHTML="";l.appendChild($("tpl").content.cloneNode(true));l.hidden=false;var w=$("who");w.hidden=false;w.innerHTML=(email?email+"　":"")+'<a id="out">登出</a>';$("out").onclick=function(){try{sessionStorage.removeItem("must-admin");sessionStorage.removeItem("must-admin-email")}catch(e){}location.reload()}}
 function onCred(r){$("gsi-msg").textContent="驗證中…";api("googleLogin",{credential:r.credential}).then(function(j){try{sessionStorage.setItem("must-admin",j.token);sessionStorage.setItem("must-admin-email",j.email||"")}catch(e){}show(j.email)}).catch(function(e){$("gsi-msg").textContent=e.message})}
 (function(){var t=null,em="";try{t=sessionStorage.getItem("must-admin");em=sessionStorage.getItem("must-admin-email")||""}catch(e){}
-if(t)return show(em);
+if(t||!/[?&]login\b/.test(location.search))return show(em);
 api("loginConfig").then(function(j){if(!j.clientId){$("gsi-msg").textContent="尚未設定 Google 登入";return}
 var sc=document.createElement("script");sc.src="https://accounts.google.com/gsi/client";sc.async=true;sc.onload=function(){google.accounts.id.initialize({client_id:j.clientId,callback:onCred,ux_mode:"popup",auto_select:false});google.accounts.id.renderButton($("gsi-btn"),{theme:"outline",size:"large",text:"signin_with",shape:"pill",locale:"zh-TW",width:260})};document.head.appendChild(sc)}).catch(function(e){$("gsi-msg").textContent=e.message})})();
 </script>
