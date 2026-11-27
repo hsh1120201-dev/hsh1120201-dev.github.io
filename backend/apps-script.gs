@@ -16,6 +16,8 @@ var INVENTORY_ID = '1GaTYKBds0xFtv-ofYkMNryKFjWpA2sU1hYhiTAUxZ2I';
 var FINANCE_ID = '1uh2QXVU3uNwI5VTFAQvu71rm89IglIsWTef7B_6JkiI';
 // 最低量通知寄給誰（多人用逗號隔開）；留空＝寄給部署這支程式的 Google 帳號
 var NOTIFY_TO = '';
+// 活動報名系統試算表 ID（超級管理員頁面要管理「後台帳號」名單時用；從報名系統試算表網址 /d/ 和 /edit 中間那段複製）
+var ACTIVITY_SHEET_ID = '';
 // 活動報名系統的 Apps Script（Google 登入與後台帳號名單沿用這裡）
 var ACTIVITY_API = 'https://script.google.com/macros/s/AKfycbyRp9pfZlfnr-UiOJizY5ASMGFyHFLM8pzPBOV4QfUZyQOuaZQ6S-k7HS-63Kvji0Xrlw/exec';
 
@@ -50,10 +52,12 @@ function doPost(e) {
   try {
     var d = JSON.parse(e.postData.contents);
     if (d.action == 'myPay') return out_(myPay_(d.name, d.pw));
+    if (d.superPw != null) return out_(super_(d));
+    if (d.action == 'pwLogin') return out_(pwLogin_(d.user, d.pw));
     if (d.action == 'changePw') return out_(changePw_(d.name, d.pw, d.newPw));
     var who = auth_(d.token);
     if (d.action == 'login') return out_({ ok: true, email: who });
-    if (d.action == 'rates') return out_({ ok: true, rates: rates_(), pws: pws_() });
+    if (d.action == 'rates' || d.action == 'saveRates') return out_({ ok: false, error: '時薪和薪水只有超級管理員看得到', notSuper: true });
     d.by = d.by || who;
     var lock = LockService.getScriptLock();
     lock.waitLock(20000);
@@ -62,7 +66,6 @@ function doPost(e) {
       else if (d.action == 'update') update_(d);
       else if (d.action == 'add') add_(d);
       else if (d.action == 'delete') del_(d);
-      else if (d.action == 'saveRates') saveRates_(d.rates || {}, d.pws || {});
       else throw new Error('未知的動作');
     } finally { lock.releaseLock(); }
     return out_({ ok: true });
@@ -172,7 +175,7 @@ function checkPw_(name, pw) {
   var cache = CacheService.getScriptCache(), k = 'fail_' + Utilities.base64EncodeWebSafe(name), n = Number(cache.get(k) || 0);
   if (n >= 5) throw new Error('密碼錯太多次，請 10 分鐘後再試');
   var all = pws_(), own = all[name], p = own || all['預設'];
-  if (!name || name == '預設' || !pw || !p || p !== pw) { cache.put(k, String(n + 1), 600); throw new Error('姓名或密碼不對（忘記密碼請找管理員）'); }
+  if (!name || name == '預設' || name == SUPER_NAME || !pw || !p || p !== pw) { cache.put(k, String(n + 1), 600); throw new Error('姓名或密碼不對（忘記密碼請找管理員）'); }
   cache.remove(k);
   return { name: name, usedDefault: !own };
 }
@@ -196,9 +199,111 @@ function changePw_(name, pw, newPw) {
   } catch (e) { return { ok: false, error: e.message }; } finally { lock.releaseLock(); }
 }
 
+// ===== 超級管理員（用密碼登入，不用 Google）=====
+// 密碼存在「時薪設定」分頁「超級管理員」那一列的 C 欄；第一次請直接在試算表填
+var SUPER_NAME = '超級管理員';
+function super_(d) {
+  try {
+    var p = pws_()[SUPER_NAME];
+    var cache = CacheService.getScriptCache(), n = Number(cache.get('fail_super') || 0);
+    if (n >= 5) throw new Error('密碼錯太多次，請 10 分鐘後再試');
+    if (!p) throw new Error('還沒設定超級管理員密碼：請在班表試算表「時薪設定」分頁加一列「超級管理員」，C 欄填密碼');
+    if (String(d.superPw || '') !== p) { cache.put('fail_super', String(n + 1), 600); throw new Error('超級管理員密碼不對'); }
+    cache.remove('fail_super');
+    var a = d.action;
+    if (a == 'superLogin') return { ok: true };
+    if (a == 'rates') { var w = pws_(); delete w[SUPER_NAME]; return { ok: true, rates: rates_(), pws: w }; }
+    var lock = LockService.getScriptLock(); lock.waitLock(20000);
+    try {
+      if (a == 'saveRates') { var pw = d.pws || {}; pw[SUPER_NAME] = p; saveRates_(d.rates || {}, pw); return { ok: true }; }
+      if (a == 'accounts') return { ok: true, accounts: accounts_() };
+      if (a == 'saveAccounts') { saveAccounts_(d.accounts || []); return { ok: true, accounts: accounts_() }; }
+      if (a == 'superPw') {
+        var np = String(d.newPw || '').trim(); if (np.length < 6) throw new Error('新密碼要 6 個字以上');
+        var all = pws_(); all[SUPER_NAME] = np; saveRates_(rates_(), all); return { ok: true };
+      }
+      if (a == 'admins') return { ok: true, admins: admins_() };
+      if (a == 'addAdmin') {
+        var em = String(d.email || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) throw new Error('Email 格式不對');
+        if (admins_().indexOf(em) < 0) adminSheet_().appendRow([em]);
+        return { ok: true, admins: admins_() };
+      }
+      if (a == 'delAdmin') {
+        var em2 = String(d.email || '').trim().toLowerCase(), list = admins_();
+        if (list.length <= 1) throw new Error('至少要留一個後台帳號');
+        var sh = adminSheet_(), v = sh.getRange(1, 1, sh.getLastRow(), 1).getDisplayValues();
+        for (var i = v.length - 1; i >= 1; i--) if (String(v[i][0]).trim().toLowerCase() == em2) sh.deleteRow(i + 1);
+        return { ok: true, admins: admins_() };
+      }
+    } finally { lock.releaseLock(); }
+    throw new Error('未知的動作');
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+// ===== 後台帳號密碼（不用 Google 的登入方式；超級管理員在超級管理員頁管理）=====
+var ACC_SHEET = '後台帳號密碼';
+function accSheet_() {
+  var ss = SpreadsheetApp.getActive(), s = ss.getSheetByName(ACC_SHEET);
+  if (!s) { s = ss.insertSheet(ACC_SHEET); s.getRange(1, 1, 1, 3).setValues([['帳號', '密碼', '備註']]).setFontWeight('bold'); s.getRange('A:B').setNumberFormat('@'); s.setFrozenRows(1); }
+  return s;
+}
+function accounts_() {
+  var s = accSheet_(); if (s.getLastRow() < 2) return [];
+  return s.getRange(2, 1, s.getLastRow() - 1, 3).getDisplayValues().filter(function (r) { return String(r[0]).trim(); })
+    .map(function (r) { return { user: String(r[0]).trim(), pw: String(r[1]).trim(), note: String(r[2]).trim() }; });
+}
+function saveAccounts_(list) {
+  var seen = {}, rows = [];
+  list.forEach(function (a) {
+    var u = String(a.user || '').trim().slice(0, 40), p = String(a.pw || '').trim().slice(0, 50);
+    if (!u || seen[u.toLowerCase()]) return; if (p.length < 4) throw new Error('「' + u + '」的密碼要 4 個字以上');
+    seen[u.toLowerCase()] = 1; rows.push([u, p, String(a.note || '').trim().slice(0, 100)]);
+  });
+  var s = accSheet_();
+  if (s.getLastRow() > 1) s.getRange(2, 1, s.getLastRow() - 1, 3).clearContent();
+  if (rows.length) s.getRange(2, 1, rows.length, 3).setValues(rows);
+}
+function secret_() {
+  var P = PropertiesService.getScriptProperties(), k = P.getProperty('tokSecret');
+  if (!k) { k = Utilities.getUuid() + Utilities.getUuid(); P.setProperty('tokSecret', k); }
+  return k;
+}
+function sign_(msg) { return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(msg, secret_())).replace(/=+$/, ''); }
+function pwLogin_(user, pw) {
+  user = String(user || '').trim(); pw = String(pw || '').trim();
+  var cache = CacheService.getScriptCache(), k = 'fail_acc_' + Utilities.base64EncodeWebSafe(user.toLowerCase()), n = Number(cache.get(k) || 0);
+  if (n >= 5) return { ok: false, error: '密碼錯太多次，請 10 分鐘後再試' };
+  var a = accounts_().filter(function (x) { return x.user.toLowerCase() == user.toLowerCase(); })[0];
+  if (!a || !pw || a.pw !== pw) { cache.put(k, String(n + 1), 600); return { ok: false, error: '帳號或密碼不對' }; }
+  cache.remove(k);
+  var exp = Date.now() + 12 * 3600 * 1000, u64 = Utilities.base64EncodeWebSafe(Utilities.newBlob(a.user).getBytes());
+  return { ok: true, token: 'b.' + exp + '.' + u64 + '.' + sign_(exp + '.' + u64), email: a.user };
+}
+// 帳號密碼登入的憑證：b.到期時間.帳號.簽章（帳號被刪掉就失效）
+function pwAuth_(token) {
+  var p = token.split('.');
+  if (p.length != 4 || Number(p[1]) < Date.now() || sign_(p[1] + '.' + p[2]) !== p[3]) throw new Error('登入已過期，請重新登入');
+  var user = Utilities.newBlob(Utilities.base64DecodeWebSafe(p[2])).getDataAsString();
+  if (!accounts_().some(function (x) { return x.user == user; })) throw new Error('登入已過期，請重新登入（帳號已被移除）');
+  return user;
+}
+
+function adminSheet_() {
+  if (!ACTIVITY_SHEET_ID) throw new Error('還沒填 ACTIVITY_SHEET_ID（報名系統試算表 ID），請在 Apps Script 第 20 行左右填好再部署');
+  var sh = SpreadsheetApp.openById(ACTIVITY_SHEET_ID).getSheetByName('後台帳號');
+  if (!sh) throw new Error('報名系統試算表找不到「後台帳號」分頁');
+  return sh;
+}
+function admins_() {
+  var sh = adminSheet_();
+  if (sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 1).getDisplayValues().map(function (r) { return String(r[0]).trim().toLowerCase(); }).filter(function (v) { return v.indexOf('@') > 0; });
+}
+
 // ===== 登入驗證：把報名系統發的登入憑證拿回報名系統確認（同一份後台帳號名單） =====
 function auth_(token) {
   token = String(token || '');
+  if (token.indexOf('b.') == 0) return pwAuth_(token);
   var parts = token.split('.');
   if (parts.length != 3 || Number(parts[0]) < Date.now()) throw new Error('登入已過期，請重新用 Google 帳號登入');
   var email = '';

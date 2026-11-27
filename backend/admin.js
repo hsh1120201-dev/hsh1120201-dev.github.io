@@ -13,16 +13,23 @@ var Admin=(function(){
   var st=document.createElement("style");st.textContent=css;document.head.appendChild(st);
   var ACT="https://script.google.com/macros/s/AKfycbyRp9pfZlfnr-UiOJizY5ASMGFyHFLM8pzPBOV4QfUZyQOuaZQ6S-k7HS-63Kvji0Xrlw/exec";
   // 跟工作人員入口、報名後台共用同一個 Google 登入憑證
-  function pass(){try{var t=sessionStorage.getItem("must-admin")||"";var p=t.split(".");if(p.length==3&&+p[0]>Date.now()&&p[1])return t}catch(e){}return ""}
-  function email(){try{return sessionStorage.getItem("must-admin-email")||""}catch(e){return ""}}
-  function logout(){try{sessionStorage.removeItem("must-admin");sessionStorage.removeItem("must-admin-email")}catch(e){}}
+  // Google 登入（跟報名後台共用 must-admin），或帳號密碼登入（base-admin，只用在基地後台）
+  function pass(){try{var t=sessionStorage.getItem("must-admin")||"";var p=t.split(".");if(p.length==3&&+p[0]>Date.now()&&p[1])return t;
+    var b=sessionStorage.getItem("base-admin")||"",q=b.split(".");if(q.length==4&&q[0]=="b"&&+q[1]>Date.now())return b}catch(e){}return ""}
+  function email(){try{return (sessionStorage.getItem("must-admin")?sessionStorage.getItem("must-admin-email"):sessionStorage.getItem("base-admin-user"))||""}catch(e){return ""}}
+  function logout(){try{["must-admin","must-admin-email","base-admin","base-admin-user"].forEach(function(k){sessionStorage.removeItem(k)})}catch(e){}}
   function act(a,d){return fetch(ACT,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({action:a},d||{}))}).then(function(r){return r.json()},function(){throw new Error("連不上登入伺服器")}).then(function(j){if(!j.ok)throw new Error(j.error||"登入失敗");return j})}
   // 跳出 Google 登入視窗，成功後呼叫 done(email)
   function login(done){
     var m=document.createElement("div");m.className="adm-mask";
-    m.innerHTML='<div class="adm-f" style="text-align:center"><h3>用 Google 帳號登入</h3><p style="color:#666;font-size:.9em">跟報名後台同一份帳號名單</p><div id="adm-gsi" style="display:flex;justify-content:center;min-height:44px"></div><p class="adm-msg"></p><div class="adm-act"><span class="sp"></span><button type="button" class="adm-sec" data-x="cancel">取消</button></div></div>';
+    m.innerHTML='<div class="adm-f" style="text-align:center"><h3>登入後台</h3><p style="color:#666;font-size:.9em">用 Google 帳號（跟報名後台同一份名單）</p><div id="adm-gsi" style="display:flex;justify-content:center;min-height:44px"></div><p style="color:#999;font-size:.85em;margin:.8em 0 .3em">或用帳號密碼</p><form class="adm-pw" style="text-align:left"><input name="u" placeholder="帳號" autocomplete="username" style="margin-bottom:6px"><input name="p" type="password" placeholder="密碼" autocomplete="current-password"><button type="submit" class="adm-pri" style="width:100%;margin-top:8px">登入</button></form><p class="adm-msg"></p><div class="adm-act"><span class="sp"></span><button type="button" class="adm-sec" data-x="cancel">取消</button></div></div>';
     document.body.appendChild(m);var msg=m.querySelector(".adm-msg");
     m.addEventListener("click",function(e){if(e.target==m||e.target.dataset.x=="cancel")m.remove()});
+    m.querySelector(".adm-pw").onsubmit=function(e){e.preventDefault();var u=this.u.value.trim(),p=this.p.value;if(!u||!p){msg.textContent="請輸入帳號和密碼";return}
+      msg.style.color="#666";msg.textContent="驗證中…";
+      fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"pwLogin",user:u,pw:p})}).then(function(r){return r.json()},function(){throw new Error("連不上後台")})
+        .then(function(k){if(!k.ok)throw new Error(k.error||"登入失敗");try{sessionStorage.setItem("base-admin",k.token);sessionStorage.setItem("base-admin-user",k.email)}catch(e){}m.remove();done(k.email)})
+        .catch(function(e){msg.style.color="";msg.textContent=e.message})};
     act("loginConfig").then(function(j){
       if(!j.clientId)throw new Error("報名系統尚未設定 Google 登入");
       function go(){google.accounts.id.initialize({client_id:j.clientId,ux_mode:"popup",auto_select:false,callback:function(r){
@@ -47,7 +54,7 @@ var Admin=(function(){
     if(typeof BASE_API=="undefined"||!BASE_API){el.innerHTML="";return}
     el.className="adm-bar";
     if(on()){el.innerHTML='<span>✏️ 編輯模式'+(email()?'（'+email()+'）':'')+'</span><button type="button" class="adm-sec" data-a="out">登出</button>'}
-    else el.innerHTML='<button type="button" class="adm-sec" data-a="in">用 Google 登入編輯</button>';
+    else el.innerHTML='<button type="button" class="adm-sec" data-a="in">登入編輯</button>';
     el.onclick=function(e){var a=e.target.dataset.a;if(!a)return;
       if(a=="out"){logout();bar(el,onChange);onChange();return}
       login(function(){bar(el,onChange);onChange()});
