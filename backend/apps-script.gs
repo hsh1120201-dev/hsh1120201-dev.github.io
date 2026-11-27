@@ -444,7 +444,8 @@ function clockLogin_(d) {
 function myClock_(d) {
   try {
     var name = clockLogin_(d), month = /^\d{4}-\d{2}$/.test(d.month || '') ? d.month : now_('yyyy-MM');
-    return { ok: true, name: name, rows: clockRows_(month, name), base: base_(), now: now_('yyyy/MM/dd HH:mm:ss') };
+    var rt = rates_();
+    return { ok: true, name: name, rows: clockRows_(month, name), base: base_(), now: now_('yyyy/MM/dd HH:mm:ss'), rate: rt[name] || 0, def: rt['預設'] || 196 };
   } catch (e) { return { ok: false, error: e.message }; }
 }
 function clock_(d) {

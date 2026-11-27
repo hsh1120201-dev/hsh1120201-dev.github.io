@@ -45,6 +45,10 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 .sum{display:flex;justify-content:space-between;margin-top:.6em;font-weight:700}
 .mon{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4em}
 .mon button{padding:.2em .7em}
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+.sumbox{background:#fff;border-radius:18px;padding:20px;width:100%;max-width:360px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.sumbox h3{margin:0 0 .2em}.sumbox .big2{font-size:2.4em;font-weight:800;margin:.2em 0;color:var(--g)}
+.sumbox table{margin:.6em 0 1em;font-size:1em}.sumbox td{padding:7px 4px}
 .app{display:flex;gap:10px;align-items:center}.app img{width:44px;height:44px;border-radius:10px}
 a{color:var(--b)}
 [hidden]{display:none!important}
@@ -98,7 +102,7 @@ a{color:var(--b)}
 <script>
 function $(id){return document.getElementById(id)}
 var IN_APP=/SCClockApp/.test(navigator.userAgent);
-var ME=null,BASE=null,ROWS=[],POS=null,VIEW=null,MODEL={},OFFDAY="";
+var ME=null,BASE=null,ROWS=[],POS=null,VIEW=null,MODEL={},OFFDAY="",RATES=null;
 function store(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(_){}}
 function load(k){try{return JSON.parse(localStorage.getItem(k)||"null")}catch(_){return null}}
 function post(body){return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})
@@ -125,7 +129,7 @@ $("lf").onsubmit=function(e){e.preventDefault();var n=$("name").value.trim(),p=$
   $("lmsg").className="msg";$("lmsg").textContent="登入中…";
   login(n,p).then(function(){$("pw").value=""},function(e){$("lmsg").className="msg err";$("lmsg").textContent=e.message})};
 function login(n,p){return post({action:"myClock",name:n,pw:p,month:ymNow()}).then(function(j){
-  ME={name:j.name,pw:p};store("clock-me",ME);BASE=j.base;ROWS=j.rows;VIEW=ymNow();start()})}
+  ME={name:j.name,pw:p};store("clock-me",ME);if(j.def){RATES={"預設":j.def};if(j.rate>0)RATES[j.name]=j.rate}BASE=j.base;ROWS=j.rows;VIEW=ymNow();start()})}
 $("out").onclick=function(){if(!confirm("確定登出？下次要重新輸入密碼。"))return;ME=null;store("clock-me",null);showGate()};
 
 function start(){$("gate").hidden=true;$("app").hidden=false;$("out").hidden=false;
@@ -141,6 +145,7 @@ function loadShift(){var M=curM();if(!M)return;var d=new Date();
         out.push('<span class="chip '+k[2]+'">今天'+k[1]+(r?" "+f2(r[0])+"–"+f2(r[1]):"")+'</span>')})}
     OFFDAY="";if(!out.length){var hol=holidayName(d.getFullYear(),d.getMonth()+1,d.getDate()),all=x?(x.early[0]||"")+(x.late[0]||""):"";
       OFFDAY=hol?"今天休館（"+hol+"）":d.getDay()==0?"今天休館（週日）":/休館|不須值勤/.test(all)?"今天休館":"今天班表上沒有你的班"}
+    if(VIEW==ymNow())drawList();
     $("shift").innerHTML=out.join("")||'<span class="chip n">'+esc(OFFDAY)+'</span>'},function(){})}
 
 function todayRows(){var t=new Date(),k=t.getFullYear()+"-"+pad(t.getMonth()+1)+"-"+pad(t.getDate());return ROWS.filter(function(r){return r.date==k})}
@@ -178,10 +183,35 @@ function punch(type){
     return post(b)}).then(function(j){
       var t=new Date();ROWS=ROWS.filter(function(r){return r.date!=j.rows[0].date}).concat(j.rows);
       res("ok","✅ "+j.type+"打卡成功 "+hm(j.time)+(j.dup?"（剛剛已經打過了）":""));
-      if(navigator.vibrate)navigator.vibrate(80);drawToday();if(VIEW==ymNow())drawList()})
+      if(navigator.vibrate)navigator.vibrate(80);drawToday();if(VIEW==ymNow())drawList();
+      if(j.type=="下班"&&isLastShift())setTimeout(showSummary,400)})
     .catch(function(e){res("err","❌ "+e.message);if(/密碼|姓名/.test(e.message)){ME=null;store("clock-me",null);setTimeout(function(){showGate(e.message)},1500)}})
     .then(function(){$("bin").disabled=$("bout").disabled=false})}
 $("bin").onclick=function(){punch("in")};$("bout").onclick=function(){punch("out")};
+
+// ---- 月結算 ----
+function hrsOf(v){var by={},tot=0;ROWS.filter(function(r){return r.date.indexOf(v)==0}).sort(function(a,b){return a.time<b.time?-1:1}).forEach(function(r){(by[r.date]=by[r.date]||[]).push(r)});
+  Object.keys(by).forEach(function(k){var L=by[k],i=L.filter(function(r){return r.type=="上班"})[0],o=L.filter(function(r){return r.type=="下班"}).pop();
+    if(i&&o&&o.time>i.time)tot+=(new Date(o.time.replace(/\//g,"-").replace(" ","T"))-new Date(i.time.replace(/\//g,"-").replace(" ","T")))/36e5});
+  return {days:Object.keys(by).length,h:tot}}
+// 班表上這個月我的班：標定時數、最後一班是幾號
+function myPlan(){var M=curM();if(!M||!MODEL||!MODEL.days)return null;var R=hourRule(MODEL),first=(new Date(M.y,M.m-1,1).getDay()+6)%7,last=new Date(M.y,M.m,0).getDate(),h=0,n=0,ld=0;
+  for(var d=1;d<=last;d++){var x=MODEL.days[d];if(!x)continue;var wd=(first+d-1)%7;
+    ["early","late"].forEach(function(k){if((x[k][0]||"")!=ME.name)return;var r=shiftRange(k,x[k],wd,R);if(!r)return;h+=r[1]-r[0];n++;ld=d})}
+  return {h:Math.round(h*100)/100,n:n,last:ld}}
+function money(x){return "NT$ "+Math.round(x).toLocaleString("en-US")}
+function showSummary(){var d=new Date(),v=ymNow(),c=hrsOf(v),P=myPlan()||{h:0,n:0},diff=c.h-P.h,rate=RATES?payRate(RATES,ME.name,d.getFullYear()):0;
+  var m=document.createElement("div");m.className="mask";
+  m.innerHTML='<div class="sumbox"><h3>'+(d.getFullYear()-1911)+" 年 "+(d.getMonth()+1)+' 月結算</h3><div class="hint" style="margin:0">這是這個月最後一班，辛苦了！</div>'+
+    '<div class="big2">'+fmtH(c.h)+' 小時</div><div class="hint" style="margin:0">本月打卡時數</div><table>'+
+    '<tr><td>出勤天數</td><td class="n">'+c.days+' 天</td></tr>'+
+    '<tr><td>班表標定時數</td><td class="n">'+(P.n?fmtH(P.h)+" 小時（"+P.n+" 班）":"讀不到班表")+'</td></tr>'+
+    (RATES?'<tr><td>時薪</td><td class="n">'+rate+' 元</td></tr>'+(P.n?'<tr><td>薪水（照班表）</td><td class="n"><b>'+money(P.h*rate)+'</b></td></tr>':"")+'<tr><td>薪水（照打卡時數）</td><td class="n"><b>'+money(c.h*rate)+'</b></td></tr>':"")+
+    (P.n?'<tr><td>差異</td><td class="n" style="color:'+(diff<-0.01?"#c0392b":"#1d6b3e")+'">'+(diff<0?"少 ":"多 ")+fmtH(Math.abs(diff))+' 小時</td></tr>':"")+
+    '</table><button class="pri" style="width:100%" type="button">知道了</button><p class="hint">時數算法：每天第一次上班到最後一次下班。薪水為稅前預估，實際以管理員核算為準；有漏打或打錯請找管理員補登。</p></div>';
+  m.querySelector("button").onclick=function(){m.remove()};document.body.appendChild(m)}
+function isLastShift(){var d=new Date(),P=myPlan(),last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+  return P&&P.last?d.getDate()>=P.last:d.getDate()==last}
 
 // ---- 本月紀錄 ----
 function drawList(){var m=VIEW.split("-");$("mt").textContent=(+m[0]-1911)+" 年 "+(+m[1])+" 月";
@@ -192,7 +222,7 @@ function drawList(){var m=VIEW.split("-");$("mt").textContent=(+m[0]-1911)+" 年
     var dt=new Date(+k.slice(0,4),+k.slice(5,7)-1,+k.slice(8));
     function cell(r){return r?hm(r.time)+(/補登/.test(r.note)?'<span class="tag">補登</span>':""):'<span style="color:#c0392b">未打</span>'}
     return "<tr><td>"+(+k.slice(5,7))+"/"+(+k.slice(8))+"（"+WK[(dt.getDay()+6)%7]+"）</td><td>"+cell(i)+"</td><td>"+cell(o)+'</td><td class="n">'+h+"</td></tr>"}).join("")||'<tr><td colspan="4" class="hint">這個月還沒有打卡紀錄</td></tr>';
-  $("days").textContent=keys.length?"出勤 "+keys.length+" 天":"";$("hours").textContent=tot?"共 "+fmtH(tot)+" 小時":""}
+  $("days").textContent=keys.length?"出勤 "+keys.length+" 天":"";var P=VIEW==ymNow()&&ME?myPlan():null;$("hours").textContent=(tot?"共 "+fmtH(tot)+" 小時":"")+(P&&P.n?"（班表 "+fmtH(P.h)+"）":"")}
 function shiftView(n){var m=VIEW.split("-"),d=new Date(+m[0],+m[1]-1+n,1),v=d.getFullYear()+"-"+pad(d.getMonth()+1);if(v>ymNow())return;VIEW=v;
   $("list").innerHTML='<tr><td colspan="4" class="hint">讀取中…</td></tr>';
   post({action:"myClock",name:ME.name,pw:ME.pw,month:v}).then(function(j){ROWS=ROWS.filter(function(r){return r.date.indexOf(v)!=0}).concat(j.rows);drawList()},function(e){$("list").innerHTML='<tr><td colspan="4" class="err">'+esc(e.message)+'</td></tr>'})}
