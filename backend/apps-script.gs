@@ -49,9 +49,10 @@ function doGet(e) {
 function doPost(e) {
   try {
     var d = JSON.parse(e.postData.contents);
+    if (d.action == 'myPay') return out_(myPay_(d.name, d.pw));
     var who = auth_(d.token);
     if (d.action == 'login') return out_({ ok: true, email: who });
-    if (d.action == 'rates') return out_({ ok: true, rates: rates_() });
+    if (d.action == 'rates') return out_({ ok: true, rates: rates_(), pws: pws_() });
     d.by = d.by || who;
     var lock = LockService.getScriptLock();
     lock.waitLock(20000);
@@ -60,7 +61,7 @@ function doPost(e) {
       else if (d.action == 'update') update_(d);
       else if (d.action == 'add') add_(d);
       else if (d.action == 'delete') del_(d);
-      else if (d.action == 'saveRates') saveRates_(d.rates || {});
+      else if (d.action == 'saveRates') saveRates_(d.rates || {}, d.pws || {});
       else throw new Error('未知的動作');
     } finally { lock.releaseLock(); }
     return out_({ ok: true });
@@ -137,19 +138,41 @@ var RATE_SHEET = '時薪設定';
 function rateSheet_() {
   var ss = SpreadsheetApp.getActive(), s = ss.getSheetByName(RATE_SHEET);
   if (!s) { s = ss.insertSheet(RATE_SHEET); s.getRange(1, 1, 2, 2).setValues([['姓名', '時薪'], ['預設', 196]]); s.getRange('1:1').setFontWeight('bold'); s.setFrozenRows(1); }
+  if (s.getRange(1, 3).getDisplayValue() != '查薪水密碼') s.getRange(1, 3).setValue('查薪水密碼').setFontWeight('bold');
   return s;
 }
+function rateRows_() { return rateSheet_().getRange(1, 1, Math.max(rateSheet_().getLastRow(), 1), 3).getDisplayValues().slice(1); }
 function rates_() {
   var o = {};
-  rateSheet_().getDataRange().getValues().slice(1).forEach(function (r) { var n = String(r[0]).trim(), v = Number(r[1]); if (n && v > 0) o[n] = v; });
+  rateRows_().forEach(function (r) { var n = String(r[0]).trim(), v = Number(String(r[1]).replace(/[^\d.]/g, '')); if (n && v > 0) o[n] = v; });
   return o;
 }
-function saveRates_(rates) {
-  var rows = [];
-  Object.keys(rates).forEach(function (k) { var v = Number(rates[k]); if (String(k).trim() && v > 0 && v < 100000) rows.push([clean_(k), v]); });
+function pws_() {
+  var o = {};
+  rateRows_().forEach(function (r) { var n = String(r[0]).trim(), p = String(r[2]).trim(); if (n && p) o[n] = p; });
+  return o;
+}
+function saveRates_(rates, pws) {
+  var rows = [], names = {};
+  Object.keys(rates).concat(Object.keys(pws)).forEach(function (k) { if (String(k).trim()) names[k] = 1; });
+  Object.keys(names).forEach(function (k) {
+    var v = Number(rates[k]); v = v > 0 && v < 100000 ? v : '';
+    var p = String(pws[k] || '').trim().slice(0, 50);
+    if (v !== '' || p) rows.push([clean_(k), v, p ? "'" + p.replace(/^'/, '') : '']);
+  });
   var s = rateSheet_();
-  if (s.getLastRow() > 1) s.getRange(2, 1, s.getLastRow() - 1, 2).clearContent();
-  if (rows.length) s.getRange(2, 1, rows.length, 2).setValues(rows);
+  if (s.getLastRow() > 1) s.getRange(2, 1, s.getLastRow() - 1, 3).clearContent();
+  if (rows.length) s.getRange(2, 1, rows.length, 3).setValues(rows);
+}
+// 前台「查我的薪水」：姓名＋密碼對了才回傳這個人的時薪（打錯 5 次鎖 10 分鐘）
+function myPay_(name, pw) {
+  name = String(name || '').trim(); pw = String(pw || '').trim();
+  var cache = CacheService.getScriptCache(), k = 'fail_' + Utilities.base64EncodeWebSafe(name), n = Number(cache.get(k) || 0);
+  if (n >= 5) return { ok: false, error: '密碼錯太多次，請 10 分鐘後再試' };
+  var p = pws_()[name];
+  if (!name || !pw || !p || p !== pw) { cache.put(k, String(n + 1), 600); return { ok: false, error: '姓名或密碼不對（還沒設密碼請找管理員）' }; }
+  var r = rates_();
+  return { ok: true, name: name, rate: r[name] || 0, def: r['預設'] || 196 };
 }
 
 // ===== 登入驗證：把報名系統發的登入憑證拿回報名系統確認（同一份後台帳號名單） =====
