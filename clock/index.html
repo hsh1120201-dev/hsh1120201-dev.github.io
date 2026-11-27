@@ -98,7 +98,7 @@ a{color:var(--b)}
 <script>
 function $(id){return document.getElementById(id)}
 var IN_APP=/SCClockApp/.test(navigator.userAgent);
-var ME=null,BASE=null,ROWS=[],POS=null,VIEW=null,MODEL={};
+var ME=null,BASE=null,ROWS=[],POS=null,VIEW=null,MODEL={},OFFDAY="";
 function store(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(_){}}
 function load(k){try{return JSON.parse(localStorage.getItem(k)||"null")}catch(_){return null}}
 function post(body){return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})
@@ -139,7 +139,9 @@ function loadShift(){var M=curM();if(!M)return;var d=new Date();
     if(x){var R=hourRule(m),wd=(d.getDay()+6)%7;
       [["early","早班","e"],["late","晚班","l"]].forEach(function(k){if((x[k[0]][0]||"")!=ME.name)return;var r=shiftRange(k[0],x[k[0]],wd,R);
         out.push('<span class="chip '+k[2]+'">今天'+k[1]+(r?" "+f2(r[0])+"–"+f2(r[1]):"")+'</span>')})}
-    $("shift").innerHTML=out.join("")||'<span class="chip n">今天班表上沒有你的班</span>'},function(){})}
+    OFFDAY="";if(!out.length){var hol=holidayName(d.getFullYear(),d.getMonth()+1,d.getDate()),all=x?(x.early[0]||"")+(x.late[0]||""):"";
+      OFFDAY=hol?"今天休館（"+hol+"）":d.getDay()==0?"今天休館（週日）":/休館|不須值勤/.test(all)?"今天休館":"今天班表上沒有你的班"}
+    $("shift").innerHTML=out.join("")||'<span class="chip n">'+esc(OFFDAY)+'</span>'},function(){})}
 
 function todayRows(){var t=new Date(),k=t.getFullYear()+"-"+pad(t.getMonth()+1)+"-"+pad(t.getDate());return ROWS.filter(function(r){return r.date==k})}
 function drawToday(){var T=todayRows(),i=T.filter(function(r){return r.type=="上班"}),o=T.filter(function(r){return r.type=="下班"});
@@ -165,6 +167,7 @@ function showLoc(){if(!POS){return}if(!BASE||!BASE.set){$("loc").className="loc"
 function res(cls,t){var e=$("res");e.className="result "+cls;e.textContent=t}
 function punch(type){
   var T=todayRows(),last=T[T.length-1];
+  if(type=="in"&&OFFDAY&&!(last&&last.type=="上班")&&!confirm(OFFDAY+"，確定要打上班卡嗎？（例如臨時支援、代班）"))return;
   if(type=="in"&&last&&last.type=="上班"&&!confirm("你今天 "+hm(last.time)+" 已經打過上班卡，還要再打一次嗎？"))return;
   if(type=="out"&&!T.some(function(r){return r.type=="上班"})&&!confirm("今天還沒打上班卡，確定要打下班卡？"))return;
   $("bin").disabled=$("bout").disabled=true;res("wait","📍 定位中…");
