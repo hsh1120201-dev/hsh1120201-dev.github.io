@@ -131,7 +131,7 @@ function start(){
   var n=new Date();MONTHS.forEach(function(M,i){if(M.y==n.getFullYear()&&M.m==n.getMonth()+1)cur=i});
   // 預設打開下個月
   if(MONTHS[cur+1])cur++;
-  $("state").textContent="讀取人員名單…";loadNames().then(function(){drawMonthSel();load()});
+  $("state").textContent="讀取人員名單…";loadNames().then(function(){drawMonthSel();load();loadRates()});
 }
 function drawMonthSel(){var M=MONTHS[cur];$("yr").value=M.yr;$("mo").innerHTML="";for(var i=1;i<=12;i++)$("mo").innerHTML+='<option value="'+i+'"'+(i==M.m?' selected':'')+'>'+i+'月</option>'}
 function pick(){var yr=+$("yr").value,m=+$("mo").value;if(dirty&&!confirm("這個月還沒儲存，確定要切換嗎？")){drawMonthSel();return}
@@ -194,15 +194,28 @@ $("rows").addEventListener("input",onEdit);$("rows").addEventListener("change",f
 function setDirty(v){dirty=v;var s=$("state");s.className="state"+(v?" dirty":"");s.textContent=v?"● 有修改還沒儲存":(src=="data"?"已儲存":"")}
 
 function toModel(){var m={days:{},notes:DEFAULT_NOTES};Object.keys(days).forEach(function(d){var x=days[d];m.days[d]={ev:x.event?[x.event]:[],early:x.early?[x.early].concat(x.earlyNote?[x.earlyNote]:[]):[],late:x.late?[x.late].concat(x.lateNote?[x.lateNote]:[]):[]}});return m}
+var RATES={"預設":196},ratesOK=false;
+function loadRates(){return Admin.api({action:"rates"}).then(function(j){RATES=j.rates||{};if(!(RATES["預設"]>0))RATES["預設"]=196;ratesOK=true;drawSide()},function(){drawSide()})}
+function rate(k){return RATES[k]>0?RATES[k]:RATES["預設"]}
+function money(n){return "$"+Math.round(n).toLocaleString("en-US")}
 function drawSide(){
-  var cnt=monthHours(toModel(),MONTHS[cur]),ks=Object.keys(cnt),tot=0;ks.forEach(function(k){tot+=cnt[k].h});
-  $("side").innerHTML='<h3>'+MONTHS[cur].yr+'年'+MONTHS[cur].m+'月 班數與時數</h3>'+(ks.length?'<table><tr><th>人員</th><th>早</th><th>晚</th><th>時數</th></tr>'+ks.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td><b>'+cnt[k].h+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th></tr></table>':'<p class="hint">還沒有排班</p>')+
+  var cnt=monthHours(toModel(),MONTHS[cur]),ks=Object.keys(cnt),tot=0,pay=0;ks.forEach(function(k){tot+=cnt[k].h;pay+=Math.round(cnt[k].h*rate(k))});
+  $("side").innerHTML='<h3>'+MONTHS[cur].yr+'年'+MONTHS[cur].m+'月 班數、時數與薪水</h3>'+(ks.length?'<table><tr><th>人員</th><th>早</th><th>晚</th><th>時數</th><th>時薪</th><th>薪水</th></tr>'+ks.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td>'+cnt[k].h+'</td><td>'+rate(k)+'</td><td><b>'+money(cnt[k].h*rate(k))+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th><th></th><th>'+money(pay)+'</th></tr></table>':'<p class="hint">還沒有排班</p>')+
+    '<p><button type="button" class="sec" id="rateBtn">設定時薪</button></p>'+
+    '<p class="hint">薪水＝時數 × 時薪（四捨五入到元），沒設定時薪的人用預設 '+RATES["預設"]+' 元。'+(ratesOK?'':'<b>時薪設定要更新 Apps Script 才能儲存，目前先用 196 元計算。</b>')+'</p>'+
     '<p class="hint">早班：平日 9:00-16:30、週六 9:00-18:00（休息時間不扣）。晚班：A 16:00-20:00、B 16:30-20:00（沒寫當 B）。備註寫「15:00-20:00」或「17:00到班」會照寫的算。</p>';
   var names={};STATUS.forEach(function(s){names[s]=1});ks.forEach(function(k){names[k]=1});
   Object.keys(_knownNames).forEach(function(k){names[k]=1});
   $("names").innerHTML=Object.keys(names).map(function(n){return '<option>'+esc(n)+'</option>'}).join("");
 }
 var _knownNames={};
+$("side").addEventListener("click",function(e){if(e.target.id!="rateBtn")return;
+  var ns={};Object.keys(monthHours(toModel(),MONTHS[cur])).forEach(function(k){ns[k]=1});Object.keys(RATES).forEach(function(k){if(k!="預設")ns[k]=1});
+  var list=Object.keys(ns);
+  Admin.form({title:"設定時薪（元／小時）",fields:[{k:"預設",label:"預設時薪（沒填的人用這個）",type:"number",value:RATES["預設"]}].concat(list.map(function(k,i){return {k:"r"+i,label:esc(k),type:"number",value:RATES[k]>0?RATES[k]:"",half:1}})),
+    submit:function(v){if(!(+v["預設"]>0))throw new Error("請填預設時薪");var r={"預設":+v["預設"]};list.forEach(function(k,i){if(+v["r"+i]>0)r[k]=+v["r"+i]});
+      return Admin.api({action:"saveRates",rates:r}).then(function(){RATES=r;ratesOK=true;drawSide()},function(e){throw new Error(/未知的動作/.test(e.message)?"要先更新 Apps Script（部署新版本）才能儲存時薪":e.message)})}});
+});
 // 收集近幾個月出現過的人名，方便輸入
 // 收集 115 年 1 月到下個月所有班表出現過的人名，做成下拉選單
 function loadNames(){var n=new Date(),L=MONTHS.filter(function(M){var diff=(M.y-n.getFullYear())*12+M.m-(n.getMonth()+1);return M.yr>=115&&diff<=1});
