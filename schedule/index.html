@@ -114,7 +114,7 @@ document.addEventListener("click",function(e){var a=e.target.dataset&&e.target.d
   if(a=="pw"){pwForm(false);return}
   var names=Object.keys(monthHours(window._lastModel||{days:{}},MONTHS[cur]));
   Admin.form({title:"登入查看我的時數與薪水",ok:"查看",fields:[{k:"name",label:"姓名",options:names.length?names:[""],value:names[0]},{k:"pw",label:"密碼（找管理員拿）",type:"password"}],
-    submit:function(v){return payLogin(v.name,v.pw).then(function(j){render();if(j.usedDefault)setTimeout(function(){pwForm(true)},50)})}});
+    submit:function(v){return payLogin(v.name,v.pw).then(render)}});
 });
 function $(id){return document.getElementById(id)}
 $("src").href="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/edit";
