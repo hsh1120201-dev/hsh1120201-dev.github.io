@@ -113,7 +113,7 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 </main>
 <script src="/backend/config.js?v=3"></script>
 <script src="/backend/admin.js?v=4"></script>
-<script src="common.js?v=5"></script>
+<script src="common.js?v=6"></script>
 <script>
 var MONTHS=monthList(),cur=0,days={},dirty=false,src="";
 var STATUS=["休館","不須值勤","無晚班","待定"];
@@ -196,9 +196,6 @@ function setDirty(v){dirty=v;var s=$("state");s.className="state"+(v?" dirty":""
 function toModel(){var m={days:{},notes:DEFAULT_NOTES};Object.keys(days).forEach(function(d){var x=days[d];m.days[d]={ev:x.event?[x.event]:[],early:x.early?[x.early].concat(x.earlyNote?[x.earlyNote]:[]):[],late:x.late?[x.late].concat(x.lateNote?[x.lateNote]:[]):[]}});return m}
 var RATES={"預設":196},ratesOK=false;
 function loadRates(){return Admin.api({action:"rates"}).then(function(j){RATES=j.rates||{};if(!(RATES["預設"]>0))RATES["預設"]=196;ratesOK=true;drawSide()},function(){drawSide()})}
-// 法定最低工資時薪（每年 9 月左右公告，隔年 1/1 生效；新年度公告後在這裡加一筆）
-var MINWAGE={2025:190,2026:196,2027:205};
-function minWage(y){var b=0,yy=0;Object.keys(MINWAGE).forEach(function(k){if(+k<=y&&+k>yy){yy=+k;b=MINWAGE[k]}});return b}
 // 時薪＝個人時薪（沒設用預設），但不會低於該年度最低工資
 function rate(k){var r=RATES[k]>0?RATES[k]:RATES["預設"];return Math.max(r,minWage(MONTHS[cur].y))}
 function money(n){return "$"+Math.round(n).toLocaleString("en-US")}
