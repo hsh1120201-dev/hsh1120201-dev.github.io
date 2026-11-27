@@ -213,8 +213,8 @@ var _knownNames={};
 $("side").addEventListener("click",function(e){if(e.target.id!="rateBtn")return;
   var ns={};Object.keys(monthHours(toModel(),MONTHS[cur])).forEach(function(k){ns[k]=1});Object.keys(RATES).concat(Object.keys(PWS)).forEach(function(k){if(k!="預設")ns[k]=1});
   var list=Object.keys(ns);
-  Admin.form({title:"設定時薪與查薪水密碼",fields:[{k:"預設",label:"預設時薪（沒填的人用這個）",type:"number",value:RATES["預設"]}].concat([].concat.apply([],list.map(function(k,i){return [{k:"r"+i,label:esc(k)+"・時薪",type:"number",value:RATES[k]>0?RATES[k]:"",half:1},{k:"p"+i,label:esc(k)+"・查薪水密碼",value:PWS[k]||"",half:1}]}))),
-    submit:function(v){if(!(+v["預設"]>0))throw new Error("請填預設時薪");var r={"預設":+v["預設"]};var pw={};list.forEach(function(k,i){if(+v["r"+i]>0)r[k]=+v["r"+i];if(v["p"+i].trim())pw[k]=v["p"+i].trim()});
+  Admin.form({title:"設定時薪與查薪水密碼",fields:[{k:"預設",label:"預設時薪（沒填的人用這個）",type:"number",value:RATES["預設"],half:1},{k:"pdef",label:"預設密碼（還沒改密碼的人用這個登入）",value:PWS["預設"]||"",half:1}].concat([].concat.apply([],list.map(function(k,i){return [{k:"r"+i,label:esc(k)+"・時薪",type:"number",value:RATES[k]>0?RATES[k]:"",half:1},{k:"p"+i,label:esc(k)+"・密碼（空白＝用預設）",value:PWS[k]||"",half:1}]}))),
+    submit:function(v){if(!(+v["預設"]>0))throw new Error("請填預設時薪");var r={"預設":+v["預設"]};var pw={};if(v.pdef.trim())pw["預設"]=v.pdef.trim();list.forEach(function(k,i){if(+v["r"+i]>0)r[k]=+v["r"+i];if(v["p"+i].trim())pw[k]=v["p"+i].trim()});
       return Admin.api({action:"saveRates",rates:r,pws:pw}).then(function(){RATES=r;PWS=pw;ratesOK=true;drawSide()},function(e){throw new Error(/未知的動作/.test(e.message)?"要先更新 Apps Script（部署新版本）才能儲存時薪":e.message)})}});
 });
 // 收集近幾個月出現過的人名，方便輸入

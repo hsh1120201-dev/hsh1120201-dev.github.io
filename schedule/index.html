@@ -98,15 +98,22 @@ var MONTHS=monthList(),cur=0,RATES={},ALL=false,ME="";
 // 薪水：管理員（後台 Google 登入）看全部；其他人輸入姓名＋密碼只看自己
 function getMe(){try{return JSON.parse(sessionStorage.getItem("pay-me")||"null")}catch(_){return null}}
 function payLogin(name,pw){return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"myPay",name:name,pw:pw})}).then(function(r){return r.json()},function(){throw new Error("連不上後台")}).then(function(j){if(!j.ok)throw new Error(j.error||"失敗");
-  RATES={"預設":j.def};if(j.rate>0)RATES[j.name]=j.rate;ME=j.name;try{sessionStorage.setItem("pay-me",JSON.stringify({name:name,pw:pw}))}catch(_){}})}
+  RATES={"預設":j.def};if(j.rate>0)RATES[j.name]=j.rate;ME=j.name;try{sessionStorage.setItem("pay-me",JSON.stringify({name:name,pw:pw}))}catch(_){}return j})}
+function pwForm(first){var m=getMe();if(!m)return;
+  Admin.form({title:first?"第一次登入，請設定自己的密碼":"修改密碼",ok:"儲存密碼",fields:[{k:"a",label:"新密碼（4 個字以上）",type:"password"},{k:"b",label:"再輸入一次",type:"password"}],
+    submit:function(v){if(v.a.length<4)throw new Error("新密碼要 4 個字以上");if(v.a!==v.b)throw new Error("兩次輸入的密碼不一樣");
+      return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"changePw",name:m.name,pw:m.pw,newPw:v.a})}).then(function(r){return r.json()}).then(function(j){if(!j.ok)throw new Error(j.error||"失敗");
+        try{sessionStorage.setItem("pay-me",JSON.stringify({name:m.name,pw:v.a}))}catch(_){}})}});
+}
 function initPay(){
   if(Admin.on())return Admin.api({action:"rates"}).then(function(j){RATES=j.rates||{};ALL=true;render()},function(){});
   var m=getMe();if(m)payLogin(m.name,m.pw).then(render,function(){try{sessionStorage.removeItem("pay-me")}catch(_){}})}
 document.addEventListener("click",function(e){var a=e.target.dataset&&e.target.dataset.pay;if(!a)return;
   if(a=="out"){ME="";RATES={};try{sessionStorage.removeItem("pay-me")}catch(_){}render();return}
+  if(a=="pw"){pwForm(false);return}
   var names=Object.keys(monthHours(window._lastModel||{days:{}},MONTHS[cur]));
   Admin.form({title:"查我的薪水",ok:"查看",fields:[{k:"name",label:"姓名",options:names.length?names:[""],value:names[0]},{k:"pw",label:"密碼（找管理員拿）",type:"password"}],
-    submit:function(v){return payLogin(v.name,v.pw).then(render)}});
+    submit:function(v){return payLogin(v.name,v.pw).then(function(j){render();if(j.usedDefault)setTimeout(function(){pwForm(true)},50)})}});
 });
 function $(id){return document.getElementById(id)}
 $("src").href="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/edit";
@@ -144,7 +151,7 @@ function render(){
     function can(k){return ALL||k==ME}
     function money(n){return "$"+Math.round(n).toLocaleString("en-US")}
     $("summary").hidden=!list.length;
-    $("summary").innerHTML='<h3>本月班數與時數'+(showPay?'、薪水':'')+' <span style="float:right;font-weight:400;font-size:.9em">'+(ALL?'管理員：看得到全部薪水':ME?esc(ME)+' 已登入 <button type="button" data-pay="out" class="adm-edit">登出</button>':'<button type="button" data-pay="in" class="adm-edit">查我的薪水</button>')+'</span></h3>'+
+    $("summary").innerHTML='<h3>本月班數與時數'+(showPay?'、薪水':'')+' <span style="float:right;font-weight:400;font-size:.9em">'+(ALL?'管理員：看得到全部薪水':ME?esc(ME)+' 已登入 <button type="button" data-pay="pw" class="adm-edit">改密碼</button><button type="button" data-pay="out" class="adm-edit">登出</button>':'<button type="button" data-pay="in" class="adm-edit">查我的薪水</button>')+'</span></h3>'+
       (ME&&cnt[ME]?'<p style="background:#fff5df;border-radius:10px;padding:8px 12px;margin:.4em 0">'+esc(ME)+' 本月 '+cnt[ME].h+' 小時 × 時薪 '+payRate(RATES,ME,M.y)+' 元 ＝ <b style="font-size:1.2em">'+money(cnt[ME].h*payRate(RATES,ME,M.y))+'</b></p>':ME?'<p class="hint">'+esc(ME)+' 這個月沒有排班</p>':'')+
       '<table><tr><th>人員</th><th>早班</th><th>晚班</th><th>時數</th>'+(showPay?'<th>時薪</th><th>薪水</th>':'')+'</tr>'+list.map(function(k){var r=payRate(RATES,k,M.y);return '<tr'+(k==who||k==ME?' style="background:#e8f1fa"':'')+'><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td>'+cnt[k].h+'</td>'+(showPay?(can(k)?'<td>'+r+'</td><td><b>'+money(cnt[k].h*r)+'</b></td>':'<td>—</td><td>—</td>'):'')+'</tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th>'+(showPay?'<th></th><th>'+(ALL?money(pay):'')+'</th>':'')+'</tr></table>'+(showPay?'<p class="hint">薪水＝時數 × 時薪（四捨五入到元），時薪在班表後台設定，不會低於當年最低工資（'+M.y+' 年 '+minWage(M.y)+' 元）。</p>':'')+'<p class="hint">時數依當月備註的值勤時間計算（休息時間不扣；晚班沒寫時段當 B 時段；格子裡寫「15:00-20:00」或「17:00到班」會照寫的算）。</p>';
   });
