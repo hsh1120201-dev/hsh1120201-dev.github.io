@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F9B72F">
+<title>上班打卡｜新竹社會創新基地</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<style>
+:root{--y:#F9B72F;--r:#EC5415;--b:#0070BA;--g:#2e8b57;--bg:#FBF7EF;--ink:#2b2b2b;--mute:#777}
+*{box-sizing:border-box}html,body{margin:0}
+body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg);min-height:100vh;-webkit-tap-highlight-color:transparent}
+main{max-width:520px;margin:0 auto;padding:max(1.2em,env(safe-area-inset-top)) 16px 3em}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:.6em}
+h1{font-size:1.35em;margin:0;letter-spacing:.06em}
+h1 small{display:block;font-size:.55em;color:var(--mute);font-weight:400;letter-spacing:0}
+.card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.06);margin:12px 0}
+.card h2{margin:0 0 .6em;font-size:1em;padding-left:.6em;border-left:5px solid var(--y)}
+input{font:inherit;font-size:16px;padding:.65em .8em;border-radius:12px;border:1px solid #ccc;width:100%;margin:.3em 0;background:#fff}
+button{font:inherit;cursor:pointer;border-radius:12px;border:0;padding:.55em 1em;font-weight:700}
+.pri{background:var(--r);color:#fff}.sec{background:#fff;border:2px solid var(--y);color:var(--ink)}
+.lnk{background:none;color:var(--b);padding:.3em .2em;font-weight:400;font-size:.9em}
+.msg{min-height:1.3em;font-size:.92em;margin:.5em 0 0}.err{color:#c0392b}.ok{color:var(--g)}
+.hint{color:var(--mute);font-size:.84em;margin:.6em 0 0;line-height:1.5}
+.clock{text-align:center;padding:18px 16px}
+.now{font-size:clamp(2.8em,15vw,4em);font-weight:800;letter-spacing:.04em;font-variant-numeric:tabular-nums;line-height:1.1}
+.today{color:var(--mute);margin:.2em 0 .6em}
+.chip{display:inline-block;border-radius:999px;padding:.25em .8em;font-size:.9em;font-weight:700;margin:2px}
+.chip.e{background:#fff4d6;color:#8a5a00}.chip.l{background:#e3effa;color:#0b4f86}.chip.n{background:#f1efea;color:#666}
+.loc{font-size:.88em;margin:.7em 0 0;color:var(--mute)}.loc.ok{color:var(--g)}.loc.bad{color:#c0392b}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.big{font-size:1.25em;padding:1em .5em;border-radius:16px;color:#fff;box-shadow:0 3px 0 rgba(0,0,0,.12)}
+.big small{display:block;font-size:.6em;font-weight:400;opacity:.9;margin-top:2px}
+.in{background:var(--g)}.out{background:var(--b)}
+.big.dim{opacity:.45}.big:disabled{opacity:.35;cursor:wait}
+.big:active{transform:translateY(2px);box-shadow:none}
+.result{margin-top:12px;border-radius:12px;padding:.7em .9em;font-weight:700;display:none}
+.result.ok{display:block;background:#e7f5ec;color:#1d6b3e}.result.err{display:block;background:#fdecea;color:#a12a1e}.result.wait{display:block;background:#f4f1ea;color:#666}
+table{width:100%;border-collapse:collapse;font-size:.92em}td,th{padding:6px 4px;border-bottom:1px solid #eee;text-align:left}th{color:var(--mute);font-weight:600;font-size:.85em}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.tag{font-size:.75em;color:#a33a0c;background:#fde8dd;border-radius:6px;padding:0 5px;margin-left:3px}
+.sum{display:flex;justify-content:space-between;margin-top:.6em;font-weight:700}
+.mon{display:flex;align-items:center;justify-content:space-between;margin-bottom:.4em}
+.mon button{padding:.2em .7em}
+.app{display:flex;gap:10px;align-items:center}.app img{width:44px;height:44px;border-radius:10px}
+a{color:var(--b)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<header><h1>上班打卡<small>新竹社會創新基地</small></h1><button class="lnk" id="out" type="button" hidden>登出</button></header>
+
+<div class="card" id="gate">
+  <h2>登入</h2>
+  <form id="lf" autocomplete="on">
+    <input id="name" list="names" placeholder="姓名（跟班表上一樣）" autocomplete="username">
+    <datalist id="names"></datalist>
+    <input id="pw" type="password" placeholder="密碼（跟查薪水的密碼一樣）" autocomplete="current-password">
+    <button class="pri" style="width:100%;margin-top:.4em">登入</button>
+  </form>
+  <p class="msg err" id="lmsg"></p>
+  <p class="hint">這支手機登入一次就會記住，之後打開直接打卡。還沒改過密碼的人用預設密碼；忘記密碼請找管理員。</p>
+</div>
+
+<div id="app" hidden>
+  <div class="card clock">
+    <div style="font-weight:700" id="hi"></div>
+    <div class="now" id="now">--:--</div>
+    <div class="today" id="date"></div>
+    <div id="shift"></div>
+    <p class="loc" id="loc"></p>
+    <div class="btns">
+      <button class="big in" id="bin" type="button">上班打卡<small id="lin"></small></button>
+      <button class="big out" id="bout" type="button">下班打卡<small id="lout"></small></button>
+    </div>
+    <div class="result" id="res"></div>
+  </div>
+
+  <div class="card">
+    <div class="mon"><button class="sec" id="prev" type="button">‹</button><h2 style="margin:0" id="mt">本月打卡</h2><button class="sec" id="next" type="button">›</button></div>
+    <table><thead><tr><th>日期</th><th>上班</th><th>下班</th><th class="n">時數</th></tr></thead><tbody id="list"></tbody></table>
+    <div class="sum"><span id="days"></span><span id="hours"></span></div>
+    <p class="hint">時數＝當天第一次上班到最後一次下班。薪水還是照班表算；忘記打卡或打錯，請找管理員在後台補登。</p>
+  </div>
+</div>
+
+<div class="card" id="get" hidden>
+  <div class="app"><img src="icon-192.png" alt=""><div><b>安裝到手機</b><div class="hint" style="margin:0">Android：<a href="app.apk" download>下載打卡 App（APK）</a><br>iPhone：用 Safari 打開本頁 → 分享 → 加入主畫面</div></div></div>
+</div>
+</main>
+
+<script src="/backend/config.js?v=4"></script>
+<script src="/schedule/common.js?v=10"></script>
+<script>
+function $(id){return document.getElementById(id)}
+var IN_APP=/SCClockApp/.test(navigator.userAgent);
+var ME=null,BASE=null,ROWS=[],POS=null,VIEW=null,MODEL={};
+function store(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v))}catch(_){}}
+function load(k){try{return JSON.parse(localStorage.getItem(k)||"null")}catch(_){return null}}
+function post(body){return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})
+  .then(function(r){return r.json()},function(){throw new Error("連不上伺服器，請確認網路後再試")})
+  .then(function(j){if(!j.ok)throw new Error(j.error||"失敗");return j})}
+function hm(t){return t?t.slice(11,16):""}
+function fmtH(h){var a=Math.floor(h+1e-9),b=Math.round((h-a)*60);if(b==60){a++;b=0}return a+":"+pad(b)}
+function ymNow(){var d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)}
+
+// ---- 時鐘 ----
+function tick(){var d=new Date();$("now").textContent=pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());
+  $("date").textContent=(d.getFullYear()-1911)+" 年 "+(d.getMonth()+1)+" 月 "+d.getDate()+" 日（"+WK[(d.getDay()+6)%7]+"）"}
+setInterval(tick,1000);tick();
+
+// ---- 登入 ----
+function showGate(m){$("gate").hidden=false;$("app").hidden=true;$("out").hidden=true;$("lmsg").textContent=m||"";loadNames()}
+var namesLoaded=false;
+function loadNames(){if(namesLoaded)return;namesLoaded=true;var n=new Date(),N={};
+  var L=monthList().filter(function(M){var d=(M.y-n.getFullYear())*12+M.m-(n.getMonth()+1);return d>=-2&&d<=1});
+  Promise.all(L.map(function(M){return loadMonth(M).then(function(m){if(m)Object.keys(monthHours(m,M)).forEach(function(k){N[k]=1})},function(){})}))
+    .then(function(){$("names").innerHTML=Object.keys(N).sort().map(function(k){return '<option value="'+esc(k)+'">'}).join("")})}
+$("lf").onsubmit=function(e){e.preventDefault();var n=$("name").value.trim(),p=$("pw").value;
+  if(!n||!p){$("lmsg").textContent="請輸入姓名和密碼";return}
+  $("lmsg").className="msg";$("lmsg").textContent="登入中…";
+  login(n,p).then(function(){$("pw").value=""},function(e){$("lmsg").className="msg err";$("lmsg").textContent=e.message})};
+function login(n,p){return post({action:"myClock",name:n,pw:p,month:ymNow()}).then(function(j){
+  ME={name:j.name,pw:p};store("clock-me",ME);BASE=j.base;ROWS=j.rows;VIEW=ymNow();start()})}
+$("out").onclick=function(){if(!confirm("確定登出？下次要重新輸入密碼。"))return;ME=null;store("clock-me",null);showGate()};
+
+function start(){$("gate").hidden=true;$("app").hidden=false;$("out").hidden=false;
+  $("hi").textContent="嗨，"+ME.name;drawToday();drawList();loadShift();locate(false)}
+
+// ---- 今天的班 ----
+function curM(){var d=new Date();return monthList().filter(function(M){return M.y==d.getFullYear()&&M.m==d.getMonth()+1})[0]}
+function f2(h){var a=Math.floor(h),b=Math.round((h-a)*60);return a+":"+pad(b)}
+function loadShift(){var M=curM();if(!M)return;var d=new Date();
+  loadMonth(M).then(function(m){MODEL=m||{};var x=m&&m.days[d.getDate()],out=[];
+    if(x){var R=hourRule(m),wd=(d.getDay()+6)%7;
+      [["early","早班","e"],["late","晚班","l"]].forEach(function(k){if((x[k[0]][0]||"")!=ME.name)return;var r=shiftRange(k[0],x[k[0]],wd,R);
+        out.push('<span class="chip '+k[2]+'">今天'+k[1]+(r?" "+f2(r[0])+"–"+f2(r[1]):"")+'</span>')})}
+    $("shift").innerHTML=out.join("")||'<span class="chip n">今天班表上沒有你的班</span>'},function(){})}
+
+function todayRows(){var t=new Date(),k=t.getFullYear()+"-"+pad(t.getMonth()+1)+"-"+pad(t.getDate());return ROWS.filter(function(r){return r.date==k})}
+function drawToday(){var T=todayRows(),i=T.filter(function(r){return r.type=="上班"}),o=T.filter(function(r){return r.type=="下班"});
+  $("lin").textContent=i.length?"已打 "+hm(i[0].time):"";$("lout").textContent=o.length?"已打 "+hm(o[o.length-1].time):"";
+  var last=T[T.length-1],wantOut=last&&last.type=="上班";
+  $("bin").classList.toggle("dim",!!wantOut);$("bout").classList.toggle("dim",!wantOut)}
+
+// ---- 定位 ----
+function locate(must){
+  if(!BASE||!BASE.set){$("loc").className="loc";$("loc").textContent="";if(!must)return Promise.resolve(null)}
+  if(!navigator.geolocation){$("loc").className="loc bad";$("loc").textContent="這支手機不支援定位";return Promise.resolve(null)}
+  $("loc").className="loc";$("loc").textContent="📍 定位中…";
+  return new Promise(function(ok){navigator.geolocation.getCurrentPosition(function(p){POS={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};showLoc();ok(POS)},
+    function(e){POS=null;$("loc").className="loc bad";$("loc").textContent=e.code==1?"📍 沒有定位權限：請到手機設定允許這個 App／瀏覽器使用位置":"📍 抓不到位置，請到窗邊或室外再試";ok(null)},
+    {enableHighAccuracy:true,timeout:15000,maximumAge:0})})}
+function distTo(p){var R=6371000,t=Math.PI/180,x=(p.lat-BASE.lat)*t,y=(p.lng-BASE.lng)*t,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(BASE.lat*t)*Math.cos(p.lat*t)*Math.sin(y/2)*Math.sin(y/2);return Math.round(2*R*Math.asin(Math.sqrt(h)))}
+function showLoc(){if(!POS){return}if(!BASE||!BASE.set){$("loc").className="loc";$("loc").textContent="";return}
+  var d=distTo(POS),inside=d-Math.min(POS.acc||0,100)<=BASE.radius;
+  $("loc").className="loc "+(inside?"ok":"bad");
+  $("loc").textContent=inside?"📍 在基地範圍內（約 "+d+" 公尺）":"📍 離基地約 "+(d>=1000?(d/1000).toFixed(1)+" 公里":d+" 公尺")+"，要在 "+BASE.radius+" 公尺內才能打卡"}
+
+// ---- 打卡 ----
+function res(cls,t){var e=$("res");e.className="result "+cls;e.textContent=t}
+function punch(type){
+  var T=todayRows(),last=T[T.length-1];
+  if(type=="in"&&last&&last.type=="上班"&&!confirm("你今天 "+hm(last.time)+" 已經打過上班卡，還要再打一次嗎？"))return;
+  if(type=="out"&&!T.some(function(r){return r.type=="上班"})&&!confirm("今天還沒打上班卡，確定要打下班卡？"))return;
+  $("bin").disabled=$("bout").disabled=true;res("wait","📍 定位中…");
+  locate(true).then(function(p){
+    if(BASE&&BASE.set&&!p)throw new Error("抓不到位置，沒辦法打卡。請開啟定位後再試");
+    res("wait","打卡中…");
+    var b={action:"clock",name:ME.name,pw:ME.pw,type:type};if(p){b.lat=p.lat;b.lng=p.lng;b.acc=p.acc}
+    return post(b)}).then(function(j){
+      var t=new Date();ROWS=ROWS.filter(function(r){return r.date!=j.rows[0].date}).concat(j.rows);
+      res("ok","✅ "+j.type+"打卡成功 "+hm(j.time)+(j.dup?"（剛剛已經打過了）":""));
+      if(navigator.vibrate)navigator.vibrate(80);drawToday();if(VIEW==ymNow())drawList()})
+    .catch(function(e){res("err","❌ "+e.message);if(/密碼|姓名/.test(e.message)){ME=null;store("clock-me",null);setTimeout(function(){showGate(e.message)},1500)}})
+    .then(function(){$("bin").disabled=$("bout").disabled=false})}
+$("bin").onclick=function(){punch("in")};$("bout").onclick=function(){punch("out")};
+
+// ---- 本月紀錄 ----
+function drawList(){var m=VIEW.split("-");$("mt").textContent=(+m[0]-1911)+" 年 "+(+m[1])+" 月";
+  var by={};ROWS.filter(function(r){return r.date.indexOf(VIEW)==0}).sort(function(a,b){return a.time<b.time?-1:1}).forEach(function(r){(by[r.date]=by[r.date]||[]).push(r)});
+  var tot=0,keys=Object.keys(by).sort().reverse();
+  $("list").innerHTML=keys.map(function(k){var L=by[k],i=L.filter(function(r){return r.type=="上班"})[0],o=L.filter(function(r){return r.type=="下班"}).pop(),h="";
+    if(i&&o&&o.time>i.time){var x=(new Date(o.time.replace(/\//g,"-").replace(" ","T"))-new Date(i.time.replace(/\//g,"-").replace(" ","T")))/36e5;tot+=x;h=fmtH(x)}
+    var dt=new Date(+k.slice(0,4),+k.slice(5,7)-1,+k.slice(8));
+    function cell(r){return r?hm(r.time)+(/補登/.test(r.note)?'<span class="tag">補登</span>':""):'<span style="color:#c0392b">未打</span>'}
+    return "<tr><td>"+(+k.slice(5,7))+"/"+(+k.slice(8))+"（"+WK[(dt.getDay()+6)%7]+"）</td><td>"+cell(i)+"</td><td>"+cell(o)+'</td><td class="n">'+h+"</td></tr>"}).join("")||'<tr><td colspan="4" class="hint">這個月還沒有打卡紀錄</td></tr>';
+  $("days").textContent=keys.length?"出勤 "+keys.length+" 天":"";$("hours").textContent=tot?"共 "+fmtH(tot)+" 小時":""}
+function shiftView(n){var m=VIEW.split("-"),d=new Date(+m[0],+m[1]-1+n,1),v=d.getFullYear()+"-"+pad(d.getMonth()+1);if(v>ymNow())return;VIEW=v;
+  $("list").innerHTML='<tr><td colspan="4" class="hint">讀取中…</td></tr>';
+  post({action:"myClock",name:ME.name,pw:ME.pw,month:v}).then(function(j){ROWS=ROWS.filter(function(r){return r.date.indexOf(v)!=0}).concat(j.rows);drawList()},function(e){$("list").innerHTML='<tr><td colspan="4" class="err">'+esc(e.message)+'</td></tr>'})}
+$("prev").onclick=function(){shiftView(-1)};$("next").onclick=function(){shiftView(1)};
+
+// 回到 App 時重新抓位置與今天紀錄
+document.addEventListener("visibilitychange",function(){if(document.visibilityState=="visible"&&ME&&!$("app").hidden){locate(false);
+  post({action:"myClock",name:ME.name,pw:ME.pw,month:ymNow()}).then(function(j){BASE=j.base;ROWS=ROWS.filter(function(r){return r.date.indexOf(ymNow())!=0}).concat(j.rows);drawToday();if(VIEW==ymNow())drawList()},function(){})}});
+
+if(!IN_APP)$("get").hidden=false;
+if("serviceWorker" in navigator&&!IN_APP)navigator.serviceWorker.register("sw.js").catch(function(){});
+var saved=load("clock-me");
+if(saved&&saved.name&&saved.pw){$("hi").textContent="嗨，"+saved.name;ME=saved;
+  login(saved.name,saved.pw).catch(function(e){if(/密碼|姓名|名單/.test(e.message)){store("clock-me",null);showGate(e.message)}else{showGate(e.message);$("name").value=saved.name;$("pw").value=saved.pw}})}
+else showGate();
+</script>
+</body>
+</html>

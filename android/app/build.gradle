@@ -1,0 +1,24 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'tw.hsinchu.scclock'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'tw.hsinchu.scclock'
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+    signingConfigs {
+        app {
+            storeFile file(System.getenv('KS_FILE') ?: 'debug.keystore')
+            storePassword System.getenv('KS_PASS') ?: 'android'
+            keyAlias System.getenv('KS_ALIAS') ?: 'androiddebugkey'
+            keyPassword System.getenv('KS_PASS') ?: 'android'
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.app }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+}

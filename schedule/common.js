@@ -102,6 +102,16 @@ function hourRule(model){
     brk:0 // 休息時間不扣（H：早班 9:00-16:30 算 7.5 小時）
   };
 }
+// 這一班的上下班時間 [開始,結束]（小時，例 9.5＝9:30）；不用上班回傳 null
+function shiftRange(kind,lines,wd,R){
+  var who=lines[0]||"";
+  if(!who||OFF.test(who)||/待定|颱風|假/.test(who)||wd==6)return null;
+  var note=lines.slice(1).join(" ");
+  var m=note.match(/(\d{1,2}:\d{2})\s*[-~～－到]\s*(\d{1,2}:\d{2})/);
+  if(m)return [tm(m[1]),tm(m[2])];
+  if(kind=="late"){var r=/A時段/.test(note)?R.A:R.B,a=note.match(/(\d{1,2}:\d{2})\s*到班/);return a?[tm(a[1]),r[1]]:r}
+  return wd==5?R.sat:R.wk;
+}
 function shiftHours(kind,lines,wd,R){
   var who=lines[0]||"";
   if(!who||OFF.test(who)||/待定|颱風|假/.test(who)||wd==6)return 0;

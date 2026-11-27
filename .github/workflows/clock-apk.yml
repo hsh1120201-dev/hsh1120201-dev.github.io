@@ -1,0 +1,37 @@
+# 打卡 App（android/）有改動時，自動打包 APK 放到 clock/app.apk（網站上就能下載）
+name: 打包上班打卡 APK
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/clock-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.7' }
+      - name: 簽章金鑰
+        env: { KS_B64: '${{ secrets.CLOCK_KEYSTORE_B64 }}' }
+        run: |
+          if [ -n "$KS_B64" ]; then echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/app.keystore"
+          else keytool -genkeypair -keystore "$RUNNER_TEMP/app.keystore" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=SCClock"; fi
+      - name: 打包
+        env:
+          KS_FILE: ${{ runner.temp }}/app.keystore
+          KS_PASS: ${{ secrets.CLOCK_KEYSTORE_PASS || 'android' }}
+          KS_ALIAS: ${{ secrets.CLOCK_KEYSTORE_ALIAS || 'androiddebugkey' }}
+        run: gradle -p android assembleRelease --no-daemon
+      - name: 放到網站
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk clock/app.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add clock/app.apk
+          git commit -m "自動打包上班打卡 APK" || exit 0
+          git pull --rebase origin main && git push origin HEAD:main

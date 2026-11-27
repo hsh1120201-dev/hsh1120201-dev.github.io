@@ -11,6 +11,7 @@
  * 6. 最低量通知：在編輯器選函式「開啟庫存通知」按執行一次（會要求寄信授權），之後每天 9 點檢查，網頁上改庫存也會馬上檢查
  *
  * 班表存在本試算表的「班表資料」分頁（第一次儲存時自動建立），原本的月份分頁不會被改動。
+ * 上班打卡存在本試算表的「打卡紀錄」分頁（第一次打卡時自動建立）；基地位置在超級管理員頁設定。
  */
 var INVENTORY_ID = '1GaTYKBds0xFtv-ofYkMNryKFjWpA2sU1hYhiTAUxZ2I';
 var FINANCE_ID = '1uh2QXVU3uNwI5VTFAQvu71rm89IglIsWTef7B_6JkiI';
@@ -55,11 +56,15 @@ function doPost(e) {
   try {
     var d = JSON.parse(e.postData.contents);
     if (d.action == 'myPay') return out_(myPay_(d.name, d.pw));
+    if (d.action == 'clock') return out_(clock_(d));
+    if (d.action == 'myClock') return out_(myClock_(d));
     if (d.superPw != null) return out_(super_(d));
     if (d.action == 'pwLogin') return out_(pwLogin_(d.user, d.pw));
     if (d.action == 'changePw') return out_(changePw_(d.name, d.pw, d.newPw));
     var who = auth_(d.token);
     if (d.action == 'login') return out_({ ok: true, email: who });
+    if (d.action == 'clockList') return out_({ ok: true, rows: clockRows_(d.month), base: base_() });
+    if (d.action == 'clockAdd' || d.action == 'clockDel') return out_(clockEdit_(d, who));
     if (d.action == 'rates' || d.action == 'saveRates') return out_({ ok: false, error: '時薪和薪水只有超級管理員看得到', notSuper: true });
     d.by = d.by || who;
     var lock = LockService.getScriptLock();
@@ -215,6 +220,8 @@ function super_(d) {
     cache.remove('fail_super');
     var a = d.action;
     if (a == 'superLogin') return { ok: true };
+    if (a == 'getBase') return { ok: true, base: base_() };
+    if (a == 'setBase') return { ok: true, base: setBase_(d) };
     if (a == 'rates') { var w = pws_(); delete w[SUPER_NAME]; return { ok: true, rates: rates_(), pws: w }; }
     var lock = LockService.getScriptLock(); lock.waitLock(20000);
     try {
@@ -368,4 +375,122 @@ function 開啟庫存通知() {
   ScriptApp.newTrigger('庫存通知').timeBased().everyDays(1).atHour(9).inTimezone('Asia/Taipei').create();
   minHead_(tbl_('inv').s, TABLES.inv.minCol);
   庫存通知();
+}
+
+// ===== 上班打卡 =====
+// 員工用「姓名＋查薪水密碼」登入打卡；有設基地位置時，要在半徑內才能打（時間以伺服器為準）
+var CLOCK_SHEET = '打卡紀錄';
+var CLOCK_HEAD = ['時間', '日期', '姓名', '類型', '距離基地(公尺)', '緯度', '經度', '定位誤差(公尺)', '備註', '登記人'];
+function clockSheet_() {
+  var ss = SpreadsheetApp.getActive(), s = ss.getSheetByName(CLOCK_SHEET);
+  if (!s) {
+    s = ss.insertSheet(CLOCK_SHEET);
+    s.getRange(1, 1, 1, CLOCK_HEAD.length).setValues([CLOCK_HEAD]).setFontWeight('bold');
+    s.getRange('A:C').setNumberFormat('@'); s.setFrozenRows(1);
+  }
+  return s;
+}
+function base_() {
+  var P = PropertiesService.getScriptProperties(), lat = parseFloat(P.getProperty('clockLat')), lng = parseFloat(P.getProperty('clockLng'));
+  var r = Number(P.getProperty('clockRadius')) || 200, ok = isFinite(lat) && isFinite(lng);
+  return { set: ok, lat: ok ? lat : null, lng: ok ? lng : null, radius: r };
+}
+function setBase_(d) {
+  var P = PropertiesService.getScriptProperties();
+  if (d.clear) { P.deleteProperty('clockLat'); P.deleteProperty('clockLng'); }
+  else if (d.lat != null) {
+    var lat = Number(d.lat), lng = Number(d.lng);
+    if (!(isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180)) throw new Error('位置格式不對');
+    P.setProperty('clockLat', String(lat)); P.setProperty('clockLng', String(lng));
+  }
+  var r = Number(d.radius);
+  if (r) { if (!(r >= 30 && r <= 5000)) throw new Error('範圍要在 30～5000 公尺之間'); P.setProperty('clockRadius', String(Math.round(r))); }
+  return base_();
+}
+function dist_(a, b, c, e) {
+  var R = 6371000, t = Math.PI / 180, x = (c - a) * t, y = (e - b) * t;
+  var h = Math.sin(x / 2) * Math.sin(x / 2) + Math.cos(a * t) * Math.cos(c * t) * Math.sin(y / 2) * Math.sin(y / 2);
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+}
+// 可以打卡的人：「時薪設定」裡的人，或班表（任何月份分頁、班表資料）上出現的名字
+function staffNames_() {
+  var cache = CacheService.getScriptCache(), c = cache.get('staffNames');
+  if (c) return JSON.parse(c);
+  var o = {}, skip = [CLOCK_SHEET, RATE_SHEET, ACC_SHEET];
+  rateRows_().forEach(function (r) { var n = String(r[0]).trim(); if (n && n != '預設' && n != SUPER_NAME) o[n] = 1; });
+  SpreadsheetApp.getActive().getSheets().forEach(function (sh) {
+    if (skip.indexOf(sh.getName()) >= 0 || sh.getLastRow() < 1) return;
+    sh.getDataRange().getDisplayValues().forEach(function (r) { r.forEach(function (v) { v = String(v).trim(); if (v.length >= 2 && v.length <= 6 && !/\d|[：:※＊*（(]/.test(v)) o[v] = 1; }); });
+  });
+  delete o[SUPER_NAME]; delete o['預設'];
+  try { cache.put('staffNames', JSON.stringify(o), 600); } catch (e) {}
+  return o;
+}
+function clockRows_(month, name) {
+  var s = clockSheet_(); if (s.getLastRow() < 2) return [];
+  var v = s.getRange(2, 1, s.getLastRow() - 1, CLOCK_HEAD.length).getDisplayValues(), out = [];
+  v.forEach(function (r, i) {
+    if (!r[0] || (month && r[1].indexOf(month) != 0) || (name && r[2] != name)) return;
+    out.push({ row: i + 2, time: r[0], date: r[1], name: r[2], type: r[3], dist: r[4], acc: r[7], note: r[8], by: r[9] });
+  });
+  return out;
+}
+function now_(f) { return Utilities.formatDate(new Date(), 'Asia/Taipei', f); }
+function clockLogin_(d) {
+  var c = checkPw_(d.name, d.pw);
+  if (!staffNames_()[c.name]) throw new Error('「' + c.name + '」不在班表或人員名單上，請找管理員加到「時薪設定」');
+  return c.name;
+}
+function myClock_(d) {
+  try {
+    var name = clockLogin_(d), month = /^\d{4}-\d{2}$/.test(d.month || '') ? d.month : now_('yyyy-MM');
+    return { ok: true, name: name, rows: clockRows_(month, name), base: base_(), now: now_('yyyy/MM/dd HH:mm:ss') };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+function clock_(d) {
+  try {
+    var name = clockLogin_(d), type = d.type == 'out' ? '下班' : '上班', b = base_(), dist = '', lat = '', lng = '', acc = '';
+    if (d.lat != null && d.lng != null && isFinite(Number(d.lat)) && isFinite(Number(d.lng))) {
+      lat = Number(d.lat); lng = Number(d.lng); acc = Math.round(Number(d.acc) || 0);
+      if (b.set) dist = dist_(b.lat, b.lng, lat, lng);
+    }
+    if (b.set) {
+      if (lat === '') throw new Error('要開啟手機定位才能打卡');
+      if (dist - Math.min(acc || 0, 100) > b.radius) throw new Error('你現在離基地約 ' + dist + ' 公尺，要在 ' + b.radius + ' 公尺內才能打卡');
+    }
+    var lock = LockService.getScriptLock(); lock.waitLock(20000);
+    try {
+      var today = now_('yyyy-MM-dd'), mine = clockRows_(today, name), last = mine[mine.length - 1];
+      var t = now_('yyyy/MM/dd HH:mm:ss');
+      // 一分鐘內重複按同一個鈕就不再記一次
+      if (last && last.type == type && (new Date(t.replace(/\//g, '-').replace(' ', 'T') + '+08:00') - new Date(last.time.replace(/\//g, '-').replace(' ', 'T') + '+08:00')) < 60000)
+        return { ok: true, dup: true, type: type, time: last.time, dist: dist, rows: mine };
+      var s = clockSheet_(), row = s.getLastRow() + 1;
+      s.getRange(row, 1, 1, 3).setNumberFormat('@');
+      s.getRange(row, 1, 1, CLOCK_HEAD.length).setValues([[t, today, clean_(name), type, dist, lat, lng, acc, clean_(String(d.note || '').slice(0, 100)), '本人']]);
+      return { ok: true, type: type, time: t, dist: dist, rows: clockRows_(today, name) };
+    } finally { lock.releaseLock(); }
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+// 後台補登／刪除打卡（忘記打卡、打錯）
+function clockEdit_(d, who) {
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var s = clockSheet_();
+    if (d.action == 'clockDel') {
+      if (!(d.row >= 2 && d.row <= s.getLastRow())) throw new Error('列號錯誤');
+      var r = s.getRange(d.row, 1, 1, 3).getDisplayValues()[0];
+      if (r[0] != d.time || r[2] != d.name) throw new Error('資料已被別人改過，請重新整理後再試');
+      s.deleteRow(d.row);
+    } else {
+      var name = String(d.name || '').trim(), date = String(d.date || ''), tm = String(d.time || '');
+      if (!name) throw new Error('請填姓名');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{1,2}:\d{2}$/.test(tm)) throw new Error('日期或時間格式不對');
+      if (tm.length == 4) tm = '0' + tm;
+      var row = s.getLastRow() + 1;
+      s.getRange(row, 1, 1, 3).setNumberFormat('@');
+      s.getRange(row, 1, 1, CLOCK_HEAD.length).setValues([[date.replace(/-/g, '/') + ' ' + tm + ':00', date, clean_(name), d.type == 'out' ? '下班' : '上班', '', '', '', '', clean_('補登' + (d.note ? '：' + String(d.note).slice(0, 100) : '')), clean_(who)]]);
+    }
+    return { ok: true, rows: clockRows_(d.month) };
+  } catch (e) { return { ok: false, error: e.message }; } finally { lock.releaseLock(); }
 }
