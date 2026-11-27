@@ -50,6 +50,7 @@ function doPost(e) {
   try {
     var d = JSON.parse(e.postData.contents);
     if (d.action == 'myPay') return out_(myPay_(d.name, d.pw));
+    if (d.action == 'changePw') return out_(changePw_(d.name, d.pw, d.newPw));
     var who = auth_(d.token);
     if (d.action == 'login') return out_({ ok: true, email: who });
     if (d.action == 'rates') return out_({ ok: true, rates: rates_(), pws: pws_() });
@@ -165,14 +166,34 @@ function saveRates_(rates, pws) {
   if (rows.length) s.getRange(2, 1, rows.length, 3).setValues(rows);
 }
 // 前台「查我的薪水」：姓名＋密碼對了才回傳這個人的時薪（打錯 5 次鎖 10 分鐘）
-function myPay_(name, pw) {
+// 還沒設自己密碼的人用「預設」那列的密碼，登入後會被要求改成自己的
+function checkPw_(name, pw) {
   name = String(name || '').trim(); pw = String(pw || '').trim();
   var cache = CacheService.getScriptCache(), k = 'fail_' + Utilities.base64EncodeWebSafe(name), n = Number(cache.get(k) || 0);
-  if (n >= 5) return { ok: false, error: '密碼錯太多次，請 10 分鐘後再試' };
-  var p = pws_()[name];
-  if (!name || !pw || !p || p !== pw) { cache.put(k, String(n + 1), 600); return { ok: false, error: '姓名或密碼不對（還沒設密碼請找管理員）' }; }
+  if (n >= 5) throw new Error('密碼錯太多次，請 10 分鐘後再試');
+  var all = pws_(), own = all[name], p = own || all['預設'];
+  if (!name || name == '預設' || !pw || !p || p !== pw) { cache.put(k, String(n + 1), 600); throw new Error('姓名或密碼不對（忘記密碼請找管理員）'); }
+  cache.remove(k);
+  return { name: name, usedDefault: !own };
+}
+function myPay_(name, pw) {
+  try { var c = checkPw_(name, pw); } catch (e) { return { ok: false, error: e.message }; }
   var r = rates_();
-  return { ok: true, name: name, rate: r[name] || 0, def: r['預設'] || 196 };
+  return { ok: true, name: c.name, rate: r[c.name] || 0, def: r['預設'] || 196, usedDefault: c.usedDefault };
+}
+function changePw_(name, pw, newPw) {
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var c = checkPw_(name, pw);
+    newPw = String(newPw || '').trim();
+    if (newPw.length < 4 || newPw.length > 50) throw new Error('新密碼要 4 個字以上');
+    if (newPw == pws_()['預設']) throw new Error('新密碼不能跟預設密碼一樣');
+    var s = rateSheet_(), v = s.getRange(1, 1, s.getLastRow(), 1).getDisplayValues(), row = 0;
+    for (var i = 1; i < v.length; i++) if (String(v[i][0]).trim() == c.name) { row = i + 1; break; }
+    if (!row) { row = s.getLastRow() + 1; s.getRange(row, 1).setValue(clean_(c.name)); }
+    s.getRange(row, 3).setNumberFormat('@').setValue(newPw);
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; } finally { lock.releaseLock(); }
 }
 
 // ===== 登入驗證：把報名系統發的登入憑證拿回報名系統確認（同一份後台帳號名單） =====
