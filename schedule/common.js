@@ -182,5 +182,3 @@ var MINWAGE={2025:190,2026:196,2027:205};
 function minWage(y){var b=0,yy=0;Object.keys(MINWAGE).forEach(function(k){if(+k<=y&&+k>yy){yy=+k;b=MINWAGE[k]}});return b}
 // 時薪＝個人時薪（沒設用預設 196），但不低於該年度最低工資
 function payRate(R,k,y){var r=R[k]>0?R[k]:(R["預設"]>0?R["預設"]:196);return Math.max(r,minWage(y))}
-function loadRates(){if(typeof BASE_API=="undefined"||!BASE_API)return Promise.resolve({});
-  return fetch(BASE_API+"?rates=1").then(function(r){return r.json()}).then(function(j){return j.ok&&j.rates?j.rates:{}}).catch(function(){return {}})}

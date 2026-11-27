@@ -113,7 +113,7 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 </main>
 <script src="/backend/config.js?v=3"></script>
 <script src="/backend/admin.js?v=4"></script>
-<script src="common.js?v=6"></script>
+<script src="common.js?v=7"></script>
 <script>
 var MONTHS=monthList(),cur=0,days={},dirty=false,src="";
 var STATUS=["休館","不須值勤","無晚班","待定"];
@@ -194,15 +194,15 @@ $("rows").addEventListener("input",onEdit);$("rows").addEventListener("change",f
 function setDirty(v){dirty=v;var s=$("state");s.className="state"+(v?" dirty":"");s.textContent=v?"● 有修改還沒儲存":(src=="data"?"已儲存":"")}
 
 function toModel(){var m={days:{},notes:DEFAULT_NOTES};Object.keys(days).forEach(function(d){var x=days[d];m.days[d]={ev:x.event?[x.event]:[],early:x.early?[x.early].concat(x.earlyNote?[x.earlyNote]:[]):[],late:x.late?[x.late].concat(x.lateNote?[x.lateNote]:[]):[]}});return m}
-var RATES={"預設":196},ratesOK=false;
-function loadRates(){return Admin.api({action:"rates"}).then(function(j){RATES=j.rates||{};if(!(RATES["預設"]>0))RATES["預設"]=196;ratesOK=true;drawSide()},function(){drawSide()})}
+var RATES={"預設":196},PWS={},ratesOK=false;
+function loadRates(){return Admin.api({action:"rates"}).then(function(j){RATES=j.rates||{};PWS=j.pws||{};if(!(RATES["預設"]>0))RATES["預設"]=196;ratesOK=true;drawSide()},function(){drawSide()})}
 // 時薪＝個人時薪（沒設用預設），但不會低於該年度最低工資
 function rate(k){var r=RATES[k]>0?RATES[k]:RATES["預設"];return Math.max(r,minWage(MONTHS[cur].y))}
 function money(n){return "$"+Math.round(n).toLocaleString("en-US")}
 function drawSide(){
   var cnt=monthHours(toModel(),MONTHS[cur]),ks=Object.keys(cnt),tot=0,pay=0;ks.forEach(function(k){tot+=cnt[k].h;pay+=Math.round(cnt[k].h*rate(k))});
   $("side").innerHTML='<h3>'+MONTHS[cur].yr+'年'+MONTHS[cur].m+'月 班數、時數與薪水</h3>'+(ks.length?'<table><tr><th>人員</th><th>早</th><th>晚</th><th>時數</th><th>時薪</th><th>薪水</th></tr>'+ks.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td>'+cnt[k].h+'</td><td>'+rate(k)+'</td><td><b>'+money(cnt[k].h*rate(k))+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th><th></th><th>'+money(pay)+'</th></tr></table>':'<p class="hint">還沒有排班</p>')+
-    '<p><button type="button" class="sec" id="rateBtn">設定時薪</button></p>'+
+    '<p><button type="button" class="sec" id="rateBtn">設定時薪／查薪水密碼</button></p>'+
     '<p class="hint">薪水＝時數 × 時薪（四捨五入到元），沒設定時薪的人用預設 '+RATES["預設"]+' 元；低於當年最低工資（'+MONTHS[cur].y+' 年 '+minWage(MONTHS[cur].y)+' 元）會自動用最低工資算。'+(ratesOK?'':'<b>時薪設定要更新 Apps Script 才能儲存，目前先用 196 元計算。</b>')+'</p>'+
     '<p class="hint">早班：平日 9:00-16:30、週六 9:00-18:00（休息時間不扣）。晚班：A 16:00-20:00、B 16:30-20:00（沒寫當 B）。備註寫「15:00-20:00」或「17:00到班」會照寫的算。</p>';
   var names={};STATUS.forEach(function(s){names[s]=1});ks.forEach(function(k){names[k]=1});
@@ -211,11 +211,11 @@ function drawSide(){
 }
 var _knownNames={};
 $("side").addEventListener("click",function(e){if(e.target.id!="rateBtn")return;
-  var ns={};Object.keys(monthHours(toModel(),MONTHS[cur])).forEach(function(k){ns[k]=1});Object.keys(RATES).forEach(function(k){if(k!="預設")ns[k]=1});
+  var ns={};Object.keys(monthHours(toModel(),MONTHS[cur])).forEach(function(k){ns[k]=1});Object.keys(RATES).concat(Object.keys(PWS)).forEach(function(k){if(k!="預設")ns[k]=1});
   var list=Object.keys(ns);
-  Admin.form({title:"設定時薪（元／小時）",fields:[{k:"預設",label:"預設時薪（沒填的人用這個）",type:"number",value:RATES["預設"]}].concat(list.map(function(k,i){return {k:"r"+i,label:esc(k),type:"number",value:RATES[k]>0?RATES[k]:"",half:1}})),
-    submit:function(v){if(!(+v["預設"]>0))throw new Error("請填預設時薪");var r={"預設":+v["預設"]};list.forEach(function(k,i){if(+v["r"+i]>0)r[k]=+v["r"+i]});
-      return Admin.api({action:"saveRates",rates:r}).then(function(){RATES=r;ratesOK=true;drawSide()},function(e){throw new Error(/未知的動作/.test(e.message)?"要先更新 Apps Script（部署新版本）才能儲存時薪":e.message)})}});
+  Admin.form({title:"設定時薪與查薪水密碼",fields:[{k:"預設",label:"預設時薪（沒填的人用這個）",type:"number",value:RATES["預設"]}].concat([].concat.apply([],list.map(function(k,i){return [{k:"r"+i,label:esc(k)+"・時薪",type:"number",value:RATES[k]>0?RATES[k]:"",half:1},{k:"p"+i,label:esc(k)+"・查薪水密碼",value:PWS[k]||"",half:1}]}))),
+    submit:function(v){if(!(+v["預設"]>0))throw new Error("請填預設時薪");var r={"預設":+v["預設"]};var pw={};list.forEach(function(k,i){if(+v["r"+i]>0)r[k]=+v["r"+i];if(v["p"+i].trim())pw[k]=v["p"+i].trim()});
+      return Admin.api({action:"saveRates",rates:r,pws:pw}).then(function(){RATES=r;PWS=pw;ratesOK=true;drawSide()},function(e){throw new Error(/未知的動作/.test(e.message)?"要先更新 Apps Script（部署新版本）才能儲存時薪":e.message)})}});
 });
 // 收集近幾個月出現過的人名，方便輸入
 // 收集 115 年 1 月到下個月所有班表出現過的人名，做成下拉選單

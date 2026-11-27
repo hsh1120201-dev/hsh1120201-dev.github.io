@@ -91,9 +91,23 @@ footer a{color:var(--b)}
 <footer><a href="admin.html">班表後台</a>｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
 </main>
 <script src="/backend/config.js?v=3"></script>
-<script src="common.js?v=6"></script>
+<script src="/backend/admin.js?v=4"></script>
+<script src="common.js?v=7"></script>
 <script>
-var MONTHS=monthList(),cur=0,RATES={};loadRates().then(function(r){RATES=r;if(MONTHS.length)render()});
+var MONTHS=monthList(),cur=0,RATES={},ALL=false,ME="";
+// 薪水：管理員（後台 Google 登入）看全部；其他人輸入姓名＋密碼只看自己
+function getMe(){try{return JSON.parse(sessionStorage.getItem("pay-me")||"null")}catch(_){return null}}
+function payLogin(name,pw){return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"myPay",name:name,pw:pw})}).then(function(r){return r.json()},function(){throw new Error("連不上後台")}).then(function(j){if(!j.ok)throw new Error(j.error||"失敗");
+  RATES={"預設":j.def};if(j.rate>0)RATES[j.name]=j.rate;ME=j.name;try{sessionStorage.setItem("pay-me",JSON.stringify({name:name,pw:pw}))}catch(_){}})}
+function initPay(){
+  if(Admin.on())return Admin.api({action:"rates"}).then(function(j){RATES=j.rates||{};ALL=true;render()},function(){});
+  var m=getMe();if(m)payLogin(m.name,m.pw).then(render,function(){try{sessionStorage.removeItem("pay-me")}catch(_){}})}
+document.addEventListener("click",function(e){var a=e.target.dataset&&e.target.dataset.pay;if(!a)return;
+  if(a=="out"){ME="";RATES={};try{sessionStorage.removeItem("pay-me")}catch(_){}render();return}
+  var names=Object.keys(monthHours(window._lastModel||{days:{}},MONTHS[cur]));
+  Admin.form({title:"查我的薪水",ok:"查看",fields:[{k:"name",label:"姓名",options:names.length?names:[""],value:names[0]},{k:"pw",label:"密碼（找管理員拿）",type:"password"}],
+    submit:function(v){return payLogin(v.name,v.pw).then(render)}});
+});
 function $(id){return document.getElementById(id)}
 $("src").href="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/edit";
 function shiftHTML(cls,label,lines){
@@ -111,7 +125,7 @@ function render(){
     if(empty){st.className="status warn";st.textContent="這個月還沒有班表，可以到後台排班（國定假日已先標出）。"}
     else if(model.draft){st.className="status warn";st.textContent="這是依 12 月模式自動排的草稿，到後台按「儲存這個月」後就會變成正式班表。"}
     else st.textContent=(model.fromData?"後台班表":"試算表「"+M.sheet+"」分頁")+"・"+new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})+" 讀取";
-    var cnt=monthHours(model,M),list=Object.keys(cnt);
+    window._lastModel=model;var cnt=monthHours(model,M),list=Object.keys(cnt);
     var who=$("who").value;if(list.indexOf(who)<0)who="";
     $("who").innerHTML='<option value="">全部人員</option>'+list.map(function(n){return '<option'+(n==who?' selected':'')+'>'+esc(n)+'</option>'}).join("");
     var h=WK.split("").map(function(w,i){return '<div class="wd'+(i==6?' sun':'')+'">'+w+'</div>'}).join("");
@@ -126,10 +140,13 @@ function render(){
     }
     $("cal").innerHTML=h;
     $("notes").innerHTML=(model.notes||[]).map(function(n){return '<div>'+esc(n)+'</div>'}).join("");
-    var tot=0,pay=0;list.forEach(function(k){tot+=cnt[k].h;pay+=Math.round(cnt[k].h*payRate(RATES,k,M.y))});
+    var tot=0,pay=0,showPay=ALL||!!ME;list.forEach(function(k){tot+=cnt[k].h;pay+=Math.round(cnt[k].h*payRate(RATES,k,M.y))});
+    function can(k){return ALL||k==ME}
     function money(n){return "$"+Math.round(n).toLocaleString("en-US")}
     $("summary").hidden=!list.length;
-    $("summary").innerHTML='<h3>本月班數、時數與薪水</h3><table><tr><th>人員</th><th>早班</th><th>晚班</th><th>時數</th><th>時薪</th><th>薪水</th></tr>'+list.map(function(k){var r=payRate(RATES,k,M.y);return '<tr'+(k==who?' style="background:#e8f1fa"':'')+'><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td>'+cnt[k].h+'</td><td>'+r+'</td><td><b>'+money(cnt[k].h*r)+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th><th></th><th>'+money(pay)+'</th></tr></table><p class="hint">薪水＝時數 × 時薪（四捨五入到元），時薪在班表後台設定，不會低於當年最低工資（'+M.y+' 年 '+minWage(M.y)+' 元）。時數依當月備註的值勤時間計算（休息時間不扣；晚班沒寫時段當 B 時段；格子裡寫「15:00-20:00」或「17:00到班」會照寫的算）。</p>';
+    $("summary").innerHTML='<h3>本月班數與時數'+(showPay?'、薪水':'')+' <span style="float:right;font-weight:400;font-size:.9em">'+(ALL?'管理員：看得到全部薪水':ME?esc(ME)+' 已登入 <button type="button" data-pay="out" class="adm-edit">登出</button>':'<button type="button" data-pay="in" class="adm-edit">查我的薪水</button>')+'</span></h3>'+
+      (ME&&cnt[ME]?'<p style="background:#fff5df;border-radius:10px;padding:8px 12px;margin:.4em 0">'+esc(ME)+' 本月 '+cnt[ME].h+' 小時 × 時薪 '+payRate(RATES,ME,M.y)+' 元 ＝ <b style="font-size:1.2em">'+money(cnt[ME].h*payRate(RATES,ME,M.y))+'</b></p>':ME?'<p class="hint">'+esc(ME)+' 這個月沒有排班</p>':'')+
+      '<table><tr><th>人員</th><th>早班</th><th>晚班</th><th>時數</th>'+(showPay?'<th>時薪</th><th>薪水</th>':'')+'</tr>'+list.map(function(k){var r=payRate(RATES,k,M.y);return '<tr'+(k==who||k==ME?' style="background:#e8f1fa"':'')+'><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td>'+cnt[k].h+'</td>'+(showPay?(can(k)?'<td>'+r+'</td><td><b>'+money(cnt[k].h*r)+'</b></td>':'<td>—</td><td>—</td>'):'')+'</tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th>'+(showPay?'<th></th><th>'+(ALL?money(pay):'')+'</th>':'')+'</tr></table>'+(showPay?'<p class="hint">薪水＝時數 × 時薪（四捨五入到元），時薪在班表後台設定，不會低於當年最低工資（'+M.y+' 年 '+minWage(M.y)+' 元）。</p>':'')+'<p class="hint">時數依當月備註的值勤時間計算（休息時間不扣；晚班沒寫時段當 B 時段；格子裡寫「15:00-20:00」或「17:00到班」會照寫的算）。</p>';
   });
 }
 function drawTabs(){var yr=MONTHS[cur].yr;$("yr").value=yr;$("tabs").innerHTML=MONTHS.map(function(M,i){return M.yr==yr?'<button type="button" data-i="'+i+'">'+M.label+'</button>':""}).join("")}
@@ -139,7 +156,7 @@ $("who").addEventListener("change",render);
 (function(){var n=new Date(),k=-1;MONTHS.forEach(function(M,i){if(M.y==n.getFullYear()&&M.m==n.getMonth()+1)k=i});
   try{var s=localStorage.getItem("sched-month3");if(s!==null&&MONTHS[+s])k=+s}catch(_){}
   cur=k>=0?k:0})();
-drawTabs();render();
+drawTabs();render();initPay();
 </script>
 </body>
 </html>
