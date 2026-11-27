@@ -37,6 +37,7 @@ function tbl_(t) { var T = TABLES[t]; if (!T) throw new Error('未知的表格')
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
+    if (p.rates) return out_({ ok: true, rates: rates_() });
     if (p.t) { var x = tbl_(p.t); return out_({ ok: true, rows: x.s.getDataRange().getDisplayValues() }); }
     var v = schedSheet_().getDataRange().getDisplayValues().slice(1);
     var month = p.month || '';
