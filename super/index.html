@@ -54,15 +54,6 @@ a{color:var(--b)}
   </div>
 
   <div class="card">
-    <h2>上班打卡：基地位置</h2>
-    <p id="bstat" class="hint" style="margin:0 0 .6em">讀取中…</p>
-    <div class="row"><label>打卡範圍（公尺）<input type="number" id="brad" min="30" max="5000" step="10" value="200"></label><button class="sec" type="button" id="bradSave">儲存範圍</button></div>
-    <p style="margin:.8em 0 0;display:flex;gap:8px;flex-wrap:wrap"><button class="pri" type="button" id="bhere">📍 用這支手機現在的位置設為基地</button><button class="del" type="button" id="bclear">取消定位限制</button></p>
-    <p class="msg" id="bmsg"></p>
-    <p class="hint">請人在基地裡，用手機打開這一頁按上面的按鈕（定位誤差會顯示在下面，越小越準）。設好後員工要在範圍內才能打卡。打卡頁：<a href="/clock/" target="_blank">/clock/</a>　打卡紀錄後台：<a href="/clock/admin.html" target="_blank">/clock/admin.html</a></p>
-  </div>
-
-  <div class="card">
     <h2>後台帳號名單（Google 登入）</h2>
     <table><tbody id="admins"><tr><td class="hint">讀取中…</td></tr></tbody></table>
     <form id="af" class="row" style="margin-top:.6em"><input type="email" id="aemail" placeholder="新增 Google 帳號（xxx@gmail.com）"><button class="sec">＋加入</button></form>
@@ -87,7 +78,7 @@ a{color:var(--b)}
 <p class="hint" style="text-align:center;margin-top:2em">本頁僅供內部使用，請勿對外分享</p>
 </main>
 <script src="/backend/config.js?v=4"></script>
-<script src="/schedule/common.js?v=10"></script>
+<script src="/schedule/common.js?v=9"></script>
 <script>
 function $(id){return document.getElementById(id)}
 function sapi(body,p){return superCall(body,p)}
@@ -99,15 +90,7 @@ $("gf").onsubmit=function(e){e.preventDefault();var p=$("gpw").value,u=$("guser"
   sapi({action:"superLogin"},p).then(function(){try{sessionStorage.setItem("super-pw",p);sessionStorage.setItem("super-user",u)}catch(_){}$("gpw").value="";$("gmsg").textContent="";start()},function(e){$("gmsg").textContent=e.message})};
 
 var RATES={},PWS={},NAMES={};
-function start(){$("gate").hidden=true;$("app").hidden=false;loadRates();loadAdmins();loadAccs();loadBase()}
-function drawBase(b){$("brad").value=b.radius;$("bstat").innerHTML=b.set?'目前基地位置：<a href="https://www.google.com/maps?q='+b.lat+','+b.lng+'" target="_blank" rel="noopener">'+b.lat.toFixed(5)+', '+b.lng.toFixed(5)+'（在地圖上看）</a>，範圍 '+b.radius+' 公尺':'⚠️ 還沒設定基地位置，現在任何地方都能打卡。'}
-function loadBase(){sapi({action:"getBase"}).then(function(j){drawBase(j.base)},function(e){msg("bmsg",e.message)})}
-$("bradSave").onclick=function(){msg("bmsg","儲存中…",true);sapi({action:"setBase",radius:+$("brad").value}).then(function(j){drawBase(j.base);msg("bmsg","已儲存",true)},function(e){msg("bmsg",e.message)})};
-$("bclear").onclick=function(){if(!confirm("取消後任何地方都能打卡，確定？"))return;sapi({action:"setBase",clear:true}).then(function(j){drawBase(j.base);msg("bmsg","已取消定位限制",true)},function(e){msg("bmsg",e.message)})};
-$("bhere").onclick=function(){if(!navigator.geolocation)return msg("bmsg","這個瀏覽器不支援定位");msg("bmsg","定位中…（第一次會問要不要允許位置）",true);
-  navigator.geolocation.getCurrentPosition(function(p){var c=p.coords;if(!confirm("定位誤差約 "+Math.round(c.accuracy)+" 公尺，要用這個位置當基地嗎？"))return msg("bmsg","");
-    sapi({action:"setBase",lat:c.latitude,lng:c.longitude,radius:+$("brad").value}).then(function(j){drawBase(j.base);msg("bmsg","已設定（誤差約 "+Math.round(c.accuracy)+" 公尺）",true)},function(e){msg("bmsg",e.message)})},
-    function(e){msg("bmsg",e.code==1?"沒有定位權限，請允許這個網站使用位置":"抓不到位置，請再試一次")},{enableHighAccuracy:true,timeout:20000,maximumAge:0})};
+function start(){$("gate").hidden=true;$("app").hidden=false;loadRates();loadAdmins();loadAccs()}
 function loadRates(){$("rates").innerHTML='<tr><td class="hint" colspan="3">讀取中…</td></tr>';
   Promise.all([sapi({action:"rates"}),collectNames()]).then(function(r){RATES=r[0].rates||{};PWS=r[0].pws||{};
     Object.keys(RATES).concat(Object.keys(PWS)).forEach(function(k){if(k!="預設")NAMES[k]=1});drawRates()},function(e){msg("rmsg",e.message)})}
