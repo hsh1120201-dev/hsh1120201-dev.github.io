@@ -31,13 +31,13 @@ a{color:var(--b)}
 </head>
 <body>
 <main>
-<header><h1>超級管理員</h1><p class="sub">薪水、時薪、查薪水密碼、後台帳號名單</p></header>
+<header><h1>超級管理員</h1><p class="sub">管理頁面：帳號密碼、時薪與薪水、後台帳號名單</p></header>
 
 <div class="card gate" id="gate">
-  <h2 style="border:0;padding:0">輸入超級管理員密碼</h2>
-  <form id="gf" class="row" style="margin-top:.6em"><input type="password" id="gpw" autocomplete="current-password" placeholder="密碼"><button class="pri">登入</button></form>
+  <h2 style="border:0;padding:0">超級管理員登入</h2>
+  <form id="gf" style="margin-top:.6em"><input id="guser" autocomplete="username" placeholder="帳號" style="margin-bottom:6px"><input type="password" id="gpw" autocomplete="current-password" placeholder="密碼"><button class="pri" style="width:100%;margin-top:8px">登入</button></form>
   <p class="msg err" id="gmsg"></p>
-  <p class="hint">第一次使用：在班表試算表「時薪設定」分頁加一列，A 欄寫「超級管理員」，C 欄填密碼。</p>
+  
 </div>
 
 <div id="app" hidden>
@@ -78,15 +78,16 @@ a{color:var(--b)}
 <p class="hint" style="text-align:center;margin-top:2em">本頁僅供內部使用，請勿對外分享</p>
 </main>
 <script src="/backend/config.js?v=4"></script>
-<script src="/schedule/common.js?v=8"></script>
+<script src="/schedule/common.js?v=9"></script>
 <script>
 function $(id){return document.getElementById(id)}
 function sapi(body,p){return superCall(body,p)}
 function msg(id,t,ok){var e=$(id);e.className="msg "+(ok?"ok":"err");e.textContent=t}
 function logout(){superLogout();$("app").hidden=true;$("gate").hidden=false}
 $("out").onclick=function(){logout();$("gmsg").textContent=""};
-$("gf").onsubmit=function(e){e.preventDefault();var p=$("gpw").value;$("gmsg").textContent="驗證中…";
-  sapi({action:"superLogin"},p).then(function(){try{sessionStorage.setItem("super-pw",p)}catch(_){}$("gpw").value="";$("gmsg").textContent="";start()},function(e){$("gmsg").textContent=e.message})};
+$("gf").onsubmit=function(e){e.preventDefault();var p=$("gpw").value,u=$("guser").value.trim();$("gmsg").textContent="驗證中…";
+  try{sessionStorage.setItem("super-user",u)}catch(_){}
+  sapi({action:"superLogin"},p).then(function(){try{sessionStorage.setItem("super-pw",p);sessionStorage.setItem("super-user",u)}catch(_){}$("gpw").value="";$("gmsg").textContent="";start()},function(e){$("gmsg").textContent=e.message})};
 
 var RATES={},PWS={},NAMES={};
 function start(){$("gate").hidden=true;$("app").hidden=false;loadRates();loadAdmins();loadAccs()}
