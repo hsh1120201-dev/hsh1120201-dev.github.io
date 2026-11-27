@@ -182,3 +182,14 @@ var MINWAGE={2025:190,2026:196,2027:205};
 function minWage(y){var b=0,yy=0;Object.keys(MINWAGE).forEach(function(k){if(+k<=y&&+k>yy){yy=+k;b=MINWAGE[k]}});return b}
 // 時薪＝個人時薪（沒設用預設 196），但不低於該年度最低工資
 function payRate(R,k,y){var r=R[k]>0?R[k]:(R["預設"]>0?R["預設"]:196);return Math.max(r,minWage(y))}
+
+// ===== 超級管理員（只用密碼登入；登入狀態存在這個分頁，關掉就登出）=====
+function superMode(){try{return sessionStorage.getItem("super-pw")?"pw":""}catch(_){return ""}}
+function superCall(body,pw){
+  if(pw==null){try{pw=sessionStorage.getItem("super-pw")}catch(_){}}
+  if(!pw)return Promise.reject(new Error("沒有登入超級管理員"));
+  body.superPw=pw;
+  return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})
+    .then(function(r){return r.json()},function(){throw new Error("連不上後台，請稍後再試")})
+    .then(function(j){if(!j.ok){if(/密碼不對|錯太多次/.test(j.error||""))superLogout();throw new Error(j.error||"失敗")}return j})}
+function superLogout(){try{sessionStorage.removeItem("super-pw")}catch(_){}}

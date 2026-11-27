@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>超級管理員｜新竹社會創新基地</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<style>
+:root{--y:#F9B72F;--r:#EC5415;--b:#0070BA;--bg:#FBF7EF}
+*{box-sizing:border-box}html,body{margin:0}
+body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#2b2b2b;background:var(--bg);min-height:100vh}
+main{max-width:860px;margin:0 auto;padding:2em 16px 3em}
+header{text-align:center;margin-bottom:1em}h1{font-size:clamp(1.4em,4vw,1.9em);margin:.2em 0;letter-spacing:.06em}
+.sub{color:#777;margin:0;font-size:.92em}
+.card{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 1px 6px rgba(0,0,0,.06);margin:14px 0}
+.card h2{margin:0 0 .6em;font-size:1.05em;padding-left:.6em;border-left:5px solid var(--y)}
+input,select{font:inherit;padding:.45em .6em;border-radius:10px;border:1px solid #ccc;width:100%}
+button{font:inherit;cursor:pointer;border-radius:10px;border:0;padding:.45em 1em;font-weight:700}
+.pri{background:var(--r);color:#fff}.sec{background:#fff;border:2px solid var(--y)}.del{background:#fff;color:#b3261e;border:1px solid #e3b3ad;font-size:.85em;padding:.25em .7em}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row>button{flex:0 0 auto}
+table{width:100%;border-collapse:collapse}td,th{padding:5px 6px;border-bottom:1px solid #eee;text-align:left;vertical-align:middle}th{color:#777;font-weight:600;font-size:.9em}
+td input{padding:.35em .5em}
+.msg{font-size:.9em;min-height:1.2em;margin:.5em 0 0}.msg.err{color:#c0392b}.msg.ok{color:#2e7d32}
+.hint{color:#777;font-size:.85em;margin:.5em 0 0}
+.gate{max-width:380px;margin:2em auto;text-align:center}
+.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.links a{color:var(--b);margin-right:12px}
+a{color:var(--b)}
+</style>
+</head>
+<body>
+<main>
+<header><h1>超級管理員</h1><p class="sub">薪水、時薪、查薪水密碼、後台帳號名單</p></header>
+
+<div class="card gate" id="gate">
+  <h2 style="border:0;padding:0">輸入超級管理員密碼</h2>
+  <form id="gf" class="row" style="margin-top:.6em"><input type="password" id="gpw" autocomplete="current-password" placeholder="密碼"><button class="pri">登入</button></form>
+  <p class="msg err" id="gmsg"></p>
+  <p class="hint">第一次使用：在班表試算表「時薪設定」分頁加一列，A 欄寫「超級管理員」，C 欄填密碼。</p>
+</div>
+
+<div id="app" hidden>
+  <div class="top"><div class="links"><a href="/schedule/" target="_blank">班表（看全部人薪水）</a><a href="/schedule/admin.html" target="_blank">班表後台</a></div><button class="sec" id="out" type="button">登出</button></div>
+
+  <div class="card">
+    <h2>時薪與查薪水密碼</h2>
+    <div class="row" style="margin-bottom:.6em"><label>預設時薪<input type="number" id="defRate" min="1" step="any"></label><label>預設密碼（還沒改密碼的人用）<input id="defPw"></label></div>
+    <table><thead><tr><th>人員</th><th>時薪（空白＝預設）</th><th>密碼（空白＝用預設）</th></tr></thead><tbody id="rates"></tbody></table>
+    <div class="row" style="margin-top:.6em"><input id="newName" placeholder="新增人員姓名"><button class="sec" type="button" id="addName">＋新增</button></div>
+    <p style="margin:.8em 0 0"><button class="pri" type="button" id="saveRates">儲存時薪與密碼</button></p>
+    <p class="msg" id="rmsg"></p>
+    <p class="hint">時薪不會低於當年最低工資（系統自動）。員工用預設密碼登入後會被要求改成自己的密碼；忘記密碼就把他的密碼清空，他可以再用預設密碼登入。</p>
+  </div>
+
+  <div class="card">
+    <h2>後台帳號名單（Google 登入）</h2>
+    <table><tbody id="admins"><tr><td class="hint">讀取中…</td></tr></tbody></table>
+    <form id="af" class="row" style="margin-top:.6em"><input type="email" id="aemail" placeholder="新增 Google 帳號（xxx@gmail.com）"><button class="sec">＋加入</button></form>
+    <p class="msg" id="amsg"></p>
+    <p class="hint">這份名單決定誰能登入報名後台、公告欄管理、班表後台、倉儲和零用金編輯。<b>新增的人還要加到 Google Cloud「測試使用者」才能登入：</b><a href="https://console.cloud.google.com/auth/audience?project=inspired-nomad-515701-j0" target="_blank" rel="noopener">開啟 Google Cloud 測試使用者設定</a>。</p>
+  </div>
+
+  <div class="card">
+    <h2>後台帳號密碼（不用 Google 的登入）</h2>
+    <table><thead><tr><th>帳號</th><th>密碼</th><th>備註（誰在用）</th><th></th></tr></thead><tbody id="accs"><tr><td class="hint" colspan="4">讀取中…</td></tr></tbody></table>
+    <p style="margin:.6em 0 0"><button class="sec" type="button" id="addAcc">＋新增帳號</button> <button class="pri" type="button" id="saveAcc">儲存帳號</button></p>
+    <p class="msg" id="cmsg"></p>
+    <p class="hint">這些帳號可以登入班表後台、倉儲清單和零用金的編輯（登入視窗下方「用帳號密碼」）。報名後台和公告欄仍只能用 Google 登入。刪掉帳號後，他已登入的畫面也會立刻失效。</p>
+  </div>
+
+  <div class="card">
+    <h2>修改超級管理員密碼</h2>
+    <form id="pf" class="row"><input type="password" id="np1" placeholder="新密碼（6 個字以上）" autocomplete="new-password"><input type="password" id="np2" placeholder="再輸入一次" autocomplete="new-password"><button class="sec">修改</button></form>
+    <p class="msg" id="pmsg"></p>
+  </div>
+</div>
+<p class="hint" style="text-align:center;margin-top:2em">本頁僅供內部使用，請勿對外分享</p>
+</main>
+<script src="/backend/config.js?v=4"></script>
+<script src="/schedule/common.js?v=8"></script>
+<script>
+function $(id){return document.getElementById(id)}
+function sapi(body,p){return superCall(body,p)}
+function msg(id,t,ok){var e=$(id);e.className="msg "+(ok?"ok":"err");e.textContent=t}
+function logout(){superLogout();$("app").hidden=true;$("gate").hidden=false}
+$("out").onclick=function(){logout();$("gmsg").textContent=""};
+$("gf").onsubmit=function(e){e.preventDefault();var p=$("gpw").value;$("gmsg").textContent="驗證中…";
+  sapi({action:"superLogin"},p).then(function(){try{sessionStorage.setItem("super-pw",p)}catch(_){}$("gpw").value="";$("gmsg").textContent="";start()},function(e){$("gmsg").textContent=e.message})};
+
+var RATES={},PWS={},NAMES={};
+function start(){$("gate").hidden=true;$("app").hidden=false;loadRates();loadAdmins();loadAccs()}
+function loadRates(){$("rates").innerHTML='<tr><td class="hint" colspan="3">讀取中…</td></tr>';
+  Promise.all([sapi({action:"rates"}),collectNames()]).then(function(r){RATES=r[0].rates||{};PWS=r[0].pws||{};
+    Object.keys(RATES).concat(Object.keys(PWS)).forEach(function(k){if(k!="預設")NAMES[k]=1});drawRates()},function(e){msg("rmsg",e.message)})}
+// 從 115 年起到下個月的班表收集人名
+function collectNames(){var n=new Date(),L=monthList().filter(function(M){var d=(M.y-n.getFullYear())*12+M.m-(n.getMonth()+1);return M.yr>=115&&d<=1});
+  return Promise.all(L.map(function(M){return loadMonth(M).then(function(m){if(m)Object.keys(monthHours(m,M)).forEach(function(k){NAMES[k]=1})},function(){})}))}
+function drawRates(){
+  $("defRate").value=RATES["預設"]||196;$("defPw").value=PWS["預設"]||"";
+  var list=Object.keys(NAMES).sort(function(a,b){return a.localeCompare(b,"zh-Hant")});
+  $("rates").innerHTML=list.map(function(k){return '<tr data-n="'+esc(k)+'"><td>'+esc(k)+'</td><td><input type="number" min="1" step="any" data-f="r" value="'+(RATES[k]>0?RATES[k]:"")+'"></td><td><input data-f="p" value="'+esc(PWS[k]||"")+'"></td></tr>'}).join("")||'<tr><td class="hint" colspan="3">還沒有人員</td></tr>';
+}
+$("addName").onclick=function(){var n=$("newName").value.trim();if(!n)return;syncRates();NAMES[n]=1;$("newName").value="";drawRates()};
+function syncRates(){$("rates").querySelectorAll("tr[data-n]").forEach(function(tr){var k=tr.dataset.n,r=tr.querySelector('[data-f=r]').value,p=tr.querySelector('[data-f=p]').value.trim();if(+r>0)RATES[k]=+r;else delete RATES[k];if(p)PWS[k]=p;else delete PWS[k]})}
+$("saveRates").onclick=function(){syncRates();var d=+$("defRate").value;if(!(d>0))return msg("rmsg","請填預設時薪");
+  RATES["預設"]=d;var dp=$("defPw").value.trim();if(dp)PWS["預設"]=dp;else delete PWS["預設"];
+  msg("rmsg","儲存中…",true);sapi({action:"saveRates",rates:RATES,pws:PWS}).then(function(){msg("rmsg","已儲存",true)},function(e){msg("rmsg",e.message)})};
+
+function drawAdmins(list){$("admins").innerHTML=list.map(function(a){return '<tr><td>'+esc(a)+'</td><td style="text-align:right"><button type="button" class="del" data-del="'+esc(a)+'">移除</button></td></tr>'}).join("")||'<tr><td class="hint">名單是空的</td></tr>'}
+function loadAdmins(){sapi({action:"admins"}).then(function(j){drawAdmins(j.admins)},function(e){$("admins").innerHTML="";msg("amsg",e.message)})}
+$("admins").onclick=function(e){var a=e.target.dataset.del;if(!a||!confirm("確定把 "+a+" 移出後台帳號名單？他將無法再登入後台。"))return;
+  msg("amsg","處理中…",true);sapi({action:"delAdmin",email:a}).then(function(j){drawAdmins(j.admins);msg("amsg","已移除 "+a,true)},function(e){msg("amsg",e.message)})};
+$("af").onsubmit=function(e){e.preventDefault();var a=$("aemail").value.trim();if(!a)return;msg("amsg","處理中…",true);
+  sapi({action:"addAdmin",email:a}).then(function(j){drawAdmins(j.admins);$("aemail").value="";msg("amsg","已加入 "+a+"。記得也加到 Google Cloud 測試使用者。",true)},function(e){msg("amsg",e.message)})};
+
+$("pf").onsubmit=function(e){e.preventDefault();var a=$("np1").value,b=$("np2").value;if(a.length<6)return msg("pmsg","新密碼要 6 個字以上");if(a!==b)return msg("pmsg","兩次輸入的密碼不一樣");
+  sapi({action:"superPw",newPw:a}).then(function(){try{sessionStorage.setItem("super-pw",a)}catch(_){}$("np1").value=$("np2").value="";msg("pmsg","已修改",true)},function(e){msg("pmsg",e.message)})};
+
+var ACCS=[];
+function drawAccs(){$("accs").innerHTML=ACCS.map(function(x,i){return '<tr data-i="'+i+'"><td><input data-f="user" value="'+esc(x.user)+'"></td><td><input data-f="pw" value="'+esc(x.pw)+'"></td><td><input data-f="note" value="'+esc(x.note||"")+'"></td><td><button type="button" class="del" data-adel="'+i+'">刪除</button></td></tr>'}).join("")||'<tr><td class="hint" colspan="4">還沒有帳號</td></tr>'}
+function syncAccs(){$("accs").querySelectorAll("tr[data-i]").forEach(function(tr){var x=ACCS[+tr.dataset.i];tr.querySelectorAll("input").forEach(function(i){x[i.dataset.f]=i.value.trim()})})}
+function loadAccs(){sapi({action:"accounts"}).then(function(j){ACCS=j.accounts;drawAccs()},function(e){msg("cmsg",e.message)})}
+$("addAcc").onclick=function(){syncAccs();ACCS.push({user:"",pw:"",note:""});drawAccs();var r=$("accs").querySelectorAll("tr");r[r.length-1].querySelector("input").focus()};
+$("accs").onclick=function(e){var i=e.target.dataset.adel;if(i==null)return;syncAccs();if(ACCS[+i].user&&!confirm("確定刪除帳號 "+ACCS[+i].user+"？（按「儲存帳號」後生效）"))return;ACCS.splice(+i,1);drawAccs()};
+$("saveAcc").onclick=function(){syncAccs();var L=ACCS.filter(function(x){return x.user});for(var i=0;i<L.length;i++)if(L[i].pw.length<4)return msg("cmsg","「"+L[i].user+"」的密碼要 4 個字以上");
+  msg("cmsg","儲存中…",true);sapi({action:"saveAccounts",accounts:L}).then(function(j){ACCS=j.accounts;drawAccs();msg("cmsg","已儲存",true)},function(e){msg("cmsg",e.message)})};
+if(superMode())sapi({action:"superLogin"}).then(start,function(){});
+</script>
+</body>
+</html>

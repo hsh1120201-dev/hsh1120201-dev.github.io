@@ -80,8 +80,8 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 <header><h1>班表後台</h1><a href="./">← 看班表</a></header>
 
 <div id="gate" class="gate">
-  <p>班表後台請用 Google 帳號登入<br><small style="color:#888">跟報名後台同一份帳號名單</small></p>
-  <button class="pri" id="login" type="button">使用 Google 帳號登入</button>
+  <p>班表後台請先登入<br><small style="color:#888">Google 帳號，或超級管理員給你的帳號密碼</small></p>
+  <button class="pri" id="login" type="button">登入</button>
   <p class="msg" id="gmsg"></p>
 </div>
 
@@ -112,8 +112,8 @@ table.ed{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;
 </div>
 </main>
 <script src="/backend/config.js?v=4"></script>
-<script src="/backend/admin.js?v=4"></script>
-<script src="common.js?v=7"></script>
+<script src="/backend/admin.js?v=5"></script>
+<script src="common.js?v=8"></script>
 <script>
 var MONTHS=monthList(),cur=0,days={},dirty=false,src="";
 var STATUS=["休館","不須值勤","無晚班","待定"];
@@ -194,15 +194,16 @@ $("rows").addEventListener("input",onEdit);$("rows").addEventListener("change",f
 function setDirty(v){dirty=v;var s=$("state");s.className="state"+(v?" dirty":"");s.textContent=v?"● 有修改還沒儲存":(src=="data"?"已儲存":"")}
 
 function toModel(){var m={days:{},notes:DEFAULT_NOTES};Object.keys(days).forEach(function(d){var x=days[d];m.days[d]={ev:x.event?[x.event]:[],early:x.early?[x.early].concat(x.earlyNote?[x.earlyNote]:[]):[],late:x.late?[x.late].concat(x.lateNote?[x.lateNote]:[]):[]}});return m}
-var RATES={"預設":196},PWS={},ratesOK=false;
-function loadRates(){return Admin.api({action:"rates"}).then(function(j){RATES=j.rates||{};PWS=j.pws||{};if(!(RATES["預設"]>0))RATES["預設"]=196;ratesOK=true;drawSide()},function(){drawSide()})}
+var RATES={"預設":196},PWS={},ratesOK=false,SUPER=false;
+function loadRates(){if(!superMode()){SUPER=false;drawSide();return Promise.resolve()}SUPER=true;return superCall({action:"rates"}).then(function(j){RATES=j.rates||{};PWS=j.pws||{};if(!(RATES["預設"]>0))RATES["預設"]=196;ratesOK=true;drawSide()},function(){SUPER=false;drawSide()})}
 // 時薪＝個人時薪（沒設用預設），但不會低於該年度最低工資
 function rate(k){var r=RATES[k]>0?RATES[k]:RATES["預設"];return Math.max(r,minWage(MONTHS[cur].y))}
 function money(n){return "$"+Math.round(n).toLocaleString("en-US")}
 function drawSide(){
   var cnt=monthHours(toModel(),MONTHS[cur]),ks=Object.keys(cnt),tot=0,pay=0;ks.forEach(function(k){tot+=cnt[k].h;pay+=Math.round(cnt[k].h*rate(k))});
+  if(!SUPER){$("side").innerHTML='<h3>'+MONTHS[cur].yr+'年'+MONTHS[cur].m+'月 班數與時數</h3>'+(ks.length?'<table><tr><th>人員</th><th>早</th><th>晚</th><th>時數</th></tr>'+ks.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td><b>'+cnt[k].h+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th></tr></table>':'<p class="hint">還沒有排班</p>')+'<p class="hint">時薪和薪水只有<a href="/super/" target="_blank">超級管理員</a>看得到。</p>'}else
   $("side").innerHTML='<h3>'+MONTHS[cur].yr+'年'+MONTHS[cur].m+'月 班數、時數與薪水</h3>'+(ks.length?'<table><tr><th>人員</th><th>早</th><th>晚</th><th>時數</th><th>時薪</th><th>薪水</th></tr>'+ks.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+cnt[k].e+'</td><td>'+cnt[k].l+'</td><td>'+cnt[k].h+'</td><td>'+rate(k)+'</td><td><b>'+money(cnt[k].h*rate(k))+'</b></td></tr>'}).join("")+'<tr><th>合計</th><th></th><th></th><th>'+Math.round(tot*100)/100+'</th><th></th><th>'+money(pay)+'</th></tr></table>':'<p class="hint">還沒有排班</p>')+
-    '<p><button type="button" class="sec" id="rateBtn">設定時薪／查薪水密碼</button></p>'+
+    '<p><a href="/super/" target="_blank">到超級管理員頁設定時薪／密碼</a></p>'+
     '<p class="hint">薪水＝時數 × 時薪（四捨五入到元），沒設定時薪的人用預設 '+RATES["預設"]+' 元；低於當年最低工資（'+MONTHS[cur].y+' 年 '+minWage(MONTHS[cur].y)+' 元）會自動用最低工資算。'+(ratesOK?'':'<b>時薪設定要更新 Apps Script 才能儲存，目前先用 196 元計算。</b>')+'</p>'+
     '<p class="hint">早班：平日 9:00-16:30、週六 9:00-18:00（休息時間不扣）。晚班：A 16:00-20:00、B 16:30-20:00（沒寫當 B）。備註寫「15:00-20:00」或「17:00到班」會照寫的算。</p>';
   var names={};STATUS.forEach(function(s){names[s]=1});ks.forEach(function(k){names[k]=1});

@@ -91,8 +91,8 @@ footer a{color:var(--b)}
 <footer><a href="admin.html">班表後台</a>｜<a id="src" target="_blank" rel="noopener">開啟試算表</a><br>本頁僅供內部使用，請勿對外分享</footer>
 </main>
 <script src="/backend/config.js?v=4"></script>
-<script src="/backend/admin.js?v=4"></script>
-<script src="common.js?v=7"></script>
+<script src="/backend/admin.js?v=5"></script>
+<script src="common.js?v=8"></script>
 <script>
 var MONTHS=monthList(),cur=0,RATES={},ALL=false,ME="";
 // 薪水：管理員（後台 Google 登入）看全部；其他人輸入姓名＋密碼只看自己
@@ -106,7 +106,8 @@ function pwForm(first){var m=getMe();if(!m)return;
         try{sessionStorage.setItem("pay-me",JSON.stringify({name:m.name,pw:v.a}))}catch(_){}})}});
 }
 function initPay(){
-  if(Admin.on())return Admin.api({action:"rates"}).then(function(j){RATES=j.rates||{};ALL=true;render()},function(){});
+  var m=getMe();
+  if(superMode())return superCall({action:"rates"}).then(function(j){RATES=j.rates||{};ALL=true;render()},function(){if(m)payLogin(m.name,m.pw).then(render,function(){})});
   var m=getMe();if(m)payLogin(m.name,m.pw).then(render,function(){try{sessionStorage.removeItem("pay-me")}catch(_){}})}
 document.addEventListener("click",function(e){var a=e.target.dataset&&e.target.dataset.pay;if(!a)return;
   if(a=="out"){ME="";RATES={};try{sessionStorage.removeItem("pay-me")}catch(_){}render();return}
