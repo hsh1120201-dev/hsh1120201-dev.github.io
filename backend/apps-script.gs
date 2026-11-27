@@ -50,6 +50,7 @@ function doPost(e) {
     var d = JSON.parse(e.postData.contents);
     var who = auth_(d.token);
     if (d.action == 'login') return out_({ ok: true, email: who });
+    if (d.action == 'rates') return out_({ ok: true, rates: rates_() });
     d.by = d.by || who;
     var lock = LockService.getScriptLock();
     lock.waitLock(20000);
@@ -58,6 +59,7 @@ function doPost(e) {
       else if (d.action == 'update') update_(d);
       else if (d.action == 'add') add_(d);
       else if (d.action == 'delete') del_(d);
+      else if (d.action == 'saveRates') saveRates_(d.rates || {});
       else throw new Error('未知的動作');
     } finally { lock.releaseLock(); }
     return out_({ ok: true });
@@ -127,6 +129,26 @@ function saveMonth_(month, days, by) {
   var rows = keep.concat(add).sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });
   if (s.getLastRow() > 1) s.getRange(2, 1, s.getLastRow() - 1, HEAD.length).clearContent();
   if (rows.length) { s.getRange(2, 1, rows.length, 1).setNumberFormat('@'); s.getRange(2, 1, rows.length, HEAD.length).setValues(rows); }
+}
+
+// ===== 時薪（存在本試算表「時薪設定」分頁：A 姓名、B 時薪；「預設」那列是沒設定的人用的時薪） =====
+var RATE_SHEET = '時薪設定';
+function rateSheet_() {
+  var ss = SpreadsheetApp.getActive(), s = ss.getSheetByName(RATE_SHEET);
+  if (!s) { s = ss.insertSheet(RATE_SHEET); s.getRange(1, 1, 2, 2).setValues([['姓名', '時薪'], ['預設', 196]]); s.getRange('1:1').setFontWeight('bold'); s.setFrozenRows(1); }
+  return s;
+}
+function rates_() {
+  var o = {};
+  rateSheet_().getDataRange().getValues().slice(1).forEach(function (r) { var n = String(r[0]).trim(), v = Number(r[1]); if (n && v > 0) o[n] = v; });
+  return o;
+}
+function saveRates_(rates) {
+  var rows = [];
+  Object.keys(rates).forEach(function (k) { var v = Number(rates[k]); if (String(k).trim() && v > 0 && v < 100000) rows.push([clean_(k), v]); });
+  var s = rateSheet_();
+  if (s.getLastRow() > 1) s.getRange(2, 1, s.getLastRow() - 1, 2).clearContent();
+  if (rows.length) s.getRange(2, 1, rows.length, 2).setValues(rows);
 }
 
 // ===== 登入驗證：把報名系統發的登入憑證拿回報名系統確認（同一份後台帳號名單） =====
