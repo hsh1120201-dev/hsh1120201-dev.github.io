@@ -18,6 +18,9 @@ var FINANCE_ID = '1uh2QXVU3uNwI5VTFAQvu71rm89IglIsWTef7B_6JkiI';
 var NOTIFY_TO = '';
 // 活動報名系統試算表 ID（超級管理員頁面要管理「後台帳號」名單時用；從報名系統試算表網址 /d/ 和 /edit 中間那段複製）
 var ACTIVITY_SHEET_ID = '';
+// 超級管理員帳號，和初始密碼（在超級管理員頁改過密碼後，就改用「時薪設定」分頁「超級管理員」列 C 欄的密碼）
+var SUPER_USER = 'admin';
+var SUPER_PASS_INIT = '';
 // 活動報名系統的 Apps Script（Google 登入與後台帳號名單沿用這裡）
 var ACTIVITY_API = 'https://script.google.com/macros/s/AKfycbyRp9pfZlfnr-UiOJizY5ASMGFyHFLM8pzPBOV4QfUZyQOuaZQ6S-k7HS-63Kvji0Xrlw/exec';
 
@@ -204,11 +207,11 @@ function changePw_(name, pw, newPw) {
 var SUPER_NAME = '超級管理員';
 function super_(d) {
   try {
-    var p = pws_()[SUPER_NAME];
+    var p = pws_()[SUPER_NAME] || SUPER_PASS_INIT;
     var cache = CacheService.getScriptCache(), n = Number(cache.get('fail_super') || 0);
     if (n >= 5) throw new Error('密碼錯太多次，請 10 分鐘後再試');
-    if (!p) throw new Error('還沒設定超級管理員密碼：請在班表試算表「時薪設定」分頁加一列「超級管理員」，C 欄填密碼');
-    if (String(d.superPw || '') !== p) { cache.put('fail_super', String(n + 1), 600); throw new Error('超級管理員密碼不對'); }
+    if (!p) throw new Error('還沒設定超級管理員密碼：請在 Apps Script 的 SUPER_PASS_INIT 填初始密碼');
+    if (String(d.superUser || '').trim().toLowerCase() !== SUPER_USER.toLowerCase() || String(d.superPw || '') !== p) { cache.put('fail_super', String(n + 1), 600); throw new Error('超級管理員帳號或密碼不對'); }
     cache.remove('fail_super');
     var a = d.action;
     if (a == 'superLogin') return { ok: true };

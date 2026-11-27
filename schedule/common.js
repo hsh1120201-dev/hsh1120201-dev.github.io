@@ -188,8 +188,8 @@ function superMode(){try{return sessionStorage.getItem("super-pw")?"pw":""}catch
 function superCall(body,pw){
   if(pw==null){try{pw=sessionStorage.getItem("super-pw")}catch(_){}}
   if(!pw)return Promise.reject(new Error("沒有登入超級管理員"));
-  body.superPw=pw;
+  body.superPw=pw;try{body.superUser=sessionStorage.getItem("super-user")||"admin"}catch(_){body.superUser="admin"}
   return fetch(BASE_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})
     .then(function(r){return r.json()},function(){throw new Error("連不上後台，請稍後再試")})
-    .then(function(j){if(!j.ok){if(/密碼不對|錯太多次/.test(j.error||""))superLogout();throw new Error(j.error||"失敗")}return j})}
-function superLogout(){try{sessionStorage.removeItem("super-pw")}catch(_){}}
+    .then(function(j){if(!j.ok){if(/帳號或密碼不對|錯太多次/.test(j.error||""))superLogout();throw new Error(j.error||"失敗")}return j})}
+function superLogout(){try{sessionStorage.removeItem("super-pw");sessionStorage.removeItem("super-user")}catch(_){}}
